@@ -59,7 +59,9 @@ fun NavigationBar(selected: Screen, onSelect: (Screen) -> Unit) {
                 label = screen.label,
                 tooltip = screen.label,
                 selected = screen == selected,
-                onClick = { onSelect(screen) }
+                onClick = { onSelect(screen) },
+                fullWidth = true,
+
             )
         }
     }

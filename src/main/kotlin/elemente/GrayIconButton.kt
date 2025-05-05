@@ -23,38 +23,40 @@ fun GrayIconButton(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    fullWidth: Boolean = false
+    fullWidth: Boolean = false,
+    enabled: Boolean = true                        // <-- NEU
 ) {
-    var isHovered by remember { mutableStateOf(false) }
+    var isHovered  by remember { mutableStateOf(false) }
     var showTooltip by remember { mutableStateOf(false) }
 
     LaunchedEffect(isHovered) {
-        if (isHovered) {
+        if (isHovered && enabled) {               // Tooltip nur bei aktivem Button
             kotlinx.coroutines.delay(1_000)
             if (isHovered) showTooltip = true
-        } else {
-            showTooltip = false
-        }
+        } else showTooltip = false
     }
 
     Box(
         modifier = modifier
             .padding(horizontal = 4.dp)
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
-            .onPointerEvent(PointerEventType.Exit) { isHovered = false }
+            .onPointerEvent(PointerEventType.Exit)  { isHovered = false }
     ) {
-        // Hier entscheidet sich jetzt die Breite des Buttons:
         val buttonMod = if (fullWidth) Modifier.fillMaxWidth() else Modifier.wrapContentWidth()
 
         Button(
-            onClick = onClick,
+            onClick  = onClick,
+            enabled  = enabled,                   // <-- weiterreichen
             modifier = buttonMod,
-            colors = ButtonDefaults.buttonColors(
-                backgroundColor = if (selected) Color(0xFF777777) else Color(0xFF555555)
+            colors   = ButtonDefaults.buttonColors(
+                backgroundColor =
+                    if (!enabled) Color(0xFF999999)
+                    else if (selected) Color(0xFF777777)
+                    else Color(0xFF555555)
             )
         ) {
             if (icon != null) {
-                Icon(imageVector = icon, contentDescription = label, tint = Color.White)
+                Icon(icon, contentDescription = label, tint = Color.White)
                 if (label.isNotEmpty()) Spacer(Modifier.width(8.dp))
             }
             if (label.isNotEmpty()) Text(label, color = Color.White)
@@ -64,7 +66,7 @@ fun GrayIconButton(
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .background(Color(0xFFEEEEEE), shape = RoundedCornerShape(4.dp))
+                    .background(Color(0xFFEEEEEE), RoundedCornerShape(4.dp))
                     .padding(4.dp)
             ) {
                 Text(tooltip, color = Color.Black, style = MaterialTheme.typography.caption)
@@ -73,8 +75,10 @@ fun GrayIconButton(
     }
 }
 
+/* --------------------------------------------------------------
+   Wrapper bleiben gleich; sie bekommen optional das neue Flag.
+-------------------------------------------------------------- */
 
-// Kompakter Button: passt sich ausschließlich dem Inhalt an
 @Composable
 fun GrayContentButton(
     icon: ImageVector? = null,
@@ -82,20 +86,13 @@ fun GrayContentButton(
     tooltip: String = "",
     selected: Boolean = false,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    GrayIconButton(
-        icon = icon,
-        label = label,
-        tooltip = tooltip,
-        selected = selected,
-        onClick = onClick,
-        modifier = modifier,
-        fullWidth = false
-    )
-}
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) = GrayIconButton(
+    icon, label, tooltip, selected, onClick,
+    modifier = modifier, fullWidth = false, enabled = enabled
+)
 
-// Füllender Button: nimmt die gesamte verfügbare Breite ein
 @Composable
 fun GrayFillButton(
     icon: ImageVector? = null,
@@ -103,15 +100,9 @@ fun GrayFillButton(
     tooltip: String = "",
     selected: Boolean = false,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    GrayIconButton(
-        icon = icon,
-        label = label,
-        tooltip = tooltip,
-        selected = selected,
-        onClick = onClick,
-        modifier = modifier,
-        fullWidth = true
-    )
-}
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
+) = GrayIconButton(
+    icon, label, tooltip, selected, onClick,
+    modifier = modifier, fullWidth = true, enabled = enabled
+)
