@@ -121,22 +121,20 @@
                 Text("Schichtenliste", style = MaterialTheme.typography.h6)
                 Spacer(Modifier.height(GAP_XS))
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(GAP_S)) {
-                    selectedAuftrag?.schichten.orEmpty().also { list ->
-                        items(
-                            items = list,
-                            key = { it.id }
-                        ) { s ->
-                            val isSel = s.id == selectedSchichtId
-                            GrayFillButton(
-                                icon = Icons.Default.DateRange,
-                                label = "Schicht ${list.indexOf(s) + 1}: ${s.startDatum?.format(dateTimeFmt).orEmpty()}",
-                                tooltip = "Schicht ${list.indexOf(s) + 1}",
-                                selected = isSel,
-                                onClick = { selectedSchichtId = s.id }
-                            )
-                        }
+                    items(
+                        items = selectedAuftrag?.schichten.orEmpty(),
+                        key = { it.id }
+                    ) { schicht ->
+                        val idx = selectedAuftrag?.schichten?.indexOf(schicht)?.plus(1) ?: 0
+                        SchichtCard(
+                            schicht = schicht,
+                            index = idx,
+                            selected = (schicht.id == selectedSchichtId),
+                            onSelect = { selectedSchichtId = schicht.id }
+                        )
                     }
                 }
+
             }
 
             Spacer(Modifier.width(GAP_M))
@@ -529,7 +527,7 @@
         var kmBisVal     by remember { mutableStateOf(TextFieldValue(initial?.kmBis.orEmpty())) }
         var massnahmeVal by remember { mutableStateOf(TextFieldValue(initial?.massnahme.orEmpty())) }
         var bemerkungVal by remember { mutableStateOf(TextFieldValue(initial?.bemerkung.orEmpty())) }
-        var lieferDateVal by remember { mutableStateOf(TextFieldValue("")) }         // neu
+        var lieferDateVal by remember { mutableStateOf(TextFieldValue(initial?.startDatum?.format(dateFmt).orEmpty())) }      // neu
 
         var modus        by remember { mutableStateOf(WiederholungsModus.KEINE) }
 
@@ -589,8 +587,7 @@
             Spacer(Modifier.height(4.dp))
             OutlinedTextField(bemerkungVal,{bemerkungVal=it},label={Text("Bemerkung")},modifier=Modifier.fillMaxWidth(),singleLine=false)
             Spacer(Modifier.height(4.dp))
-            OutlinedTextField(lieferDateVal,{lieferDateVal=it},label={Text("Liefer‑Datum (optional)")},placeholder={Text("TT.MM.JJJJ")},isError=!lieferOk,modifier=Modifier.fillMaxWidth())
-
+            OutlinedTextField(lieferDateVal, { lieferDateVal = it }, label = { Text("Liefer-Datum (optional)") }, placeholder = { Text("TT.MM.JJJJ") }, isError = !lieferOk, modifier = Modifier.fillMaxWidth())
             /* -------- Wiederholungsmodus‑Bereich -------- */
             Spacer(Modifier.height(8.dp))
             Text("Wiederholungsmodus", style=MaterialTheme.typography.subtitle1)
@@ -633,19 +630,32 @@
                 onDelete?.let{ OutlinedButton(it, colors=ButtonDefaults.outlinedButtonColors(contentColor=Color.Red)) {
                     Icon(Icons.Default.Delete,"");Spacer(Modifier.width(4.dp));Text("Löschen") } }
                 Spacer(Modifier.weight(1f))
-                Button(onClick={
-                    onSave(
-                        initial?.id,
-                        sapVal.text.trim(), ortVal.text.trim(), streckeVal.text.trim(),
-                        kmVonVal.text.trim(), kmBisVal.text.trim(), massnahmeVal.text.trim(), bemerkungVal.text.trim(),
-                        lieferDateVal.text.trim().ifBlank { null },
-                        modus,
-                        rsDateVal.text.trim(), rsTimeVal.text.trim(),
-                        reDateVal.text.trim(), reTimeVal.text.trim(),
-                        anzahlVal.text.toIntOrNull(), dauerVal.text.toLongOrNull()
-                    )
-                }, enabled=canSave) {
-                    Icon(Icons.Default.Add,"");Spacer(Modifier.width(4.dp));Text("Speichern")
+                Button(
+                    onClick = {
+                        onSave(
+                            initial?.id,
+                            sapVal.text.trim(),
+                            ortVal.text.trim(),
+                            streckeVal.text.trim(),
+                            kmVonVal.text.trim(),
+                            kmBisVal.text.trim(),
+                            massnahmeVal.text.trim(),
+                            bemerkungVal.text.trim(),
+                            lieferDateVal.text.trim().ifBlank { null },  // jetzt korrekt vorbelegt
+                            modus,
+                            rsDateVal.text.trim(),
+                            rsTimeVal.text.trim(),
+                            reDateVal.text.trim(),
+                            reTimeVal.text.trim(),
+                            anzahlVal.text.toIntOrNull(),
+                            dauerVal.text.toLongOrNull()
+                        )
+                    },
+                    enabled = canSave
+                ) {
+                    Icon(Icons.Default.Add, "")
+                    Spacer(Modifier.width(4.dp))
+                    Text("Speichern")
                 }
             }
         }
@@ -862,10 +872,19 @@
 
     fun String?.toLocalDateTimeOrNull(): LocalDateTime? {
         if (this.isNullOrBlank()) return null
-        for (f in FMT) try { return LocalDateTime.parse(this.trim(), f) }
-        catch (_: DateTimeParseException) {}
+        // 1) vollen Datum-Zeit-Parser
+        runCatching {
+            return LocalDateTime.parse(this.trim(), DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm"))
+        }
+        // 2) Datums-Parser + atStartOfDay()
+        runCatching {
+            return LocalDate
+                .parse(this.trim(), DateTimeFormatter.ofPattern("dd.MM.yyyy"))
+                .atStartOfDay()
+        }
         return null
     }
+
 
 
     /* ==========================================================
@@ -1011,4 +1030,87 @@
                 TextButton(onClick = { onClose(null) })     { Text("Abbrechen") }
             }
         )
+    }
+
+
+
+
+    @Composable
+    fun SchichtCard(
+        schicht: Schicht,
+        index: Int,
+        selected: Boolean = false,
+        onSelect: () -> Unit = {}
+    ) {
+        // Farben wie in AuftragCard
+        val grayNormal = Color(0xFF555555)
+        val graySelected = Color(0xFF777777)
+        val grayBorder = Color(0xFF999999)
+        val bgColor = if (selected) graySelected else grayNormal
+        val txtColor = Color.White
+
+        val dateFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+        val start = schicht.startDatum
+        val ende = schicht.endDatum
+        val pauseMin = schicht.pausenZeit
+        val durationText = if (start != null && ende != null) {
+            val total = Duration.between(start, ende)
+            val netto = total.minusMinutes(pauseMin.toLong())
+            String.format("%dh %02dm", netto.toHours(), netto.toMinutesPart())
+        } else {
+            "–"
+        }
+        val mitarbeiterCount = schicht.mitarbeiter?.size ?: 0
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+                .clickable(onClick = onSelect),
+            backgroundColor = bgColor,
+            elevation = 0.dp,
+            border = BorderStroke(1.dp, grayBorder)
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                // Laufende Schicht
+                Text(
+                    text = "Schicht $index",
+                    style = MaterialTheme.typography.subtitle1,
+                    color = txtColor
+                )
+                Spacer(Modifier.height(4.dp))
+                // Startdatum und Uhrzeit
+                Text(
+                    text = "Start: ${start?.format(dateFmt).orEmpty()}",
+                    style = MaterialTheme.typography.body2,
+                    color = txtColor
+                )
+                // Endedatum und Uhrzeit
+                Text(
+                    text = "Ende:  ${ende?.format(dateFmt).orEmpty()}",
+                    style = MaterialTheme.typography.body2,
+                    color = txtColor
+                )
+                Spacer(Modifier.height(4.dp))
+                // Pause
+                Text(
+                    text = "Pause: ${pauseMin}m",
+                    style = MaterialTheme.typography.body2,
+                    color = txtColor
+                )
+                // Netto-Stunden
+                Text(
+                    text = "Netto: $durationText",
+                    style = MaterialTheme.typography.body2,
+                    color = txtColor
+                )
+                Spacer(Modifier.height(4.dp))
+                // Anzahl Mitarbeiter
+                Text(
+                    text = "Mitarbeiter: $mitarbeiterCount",
+                    style = MaterialTheme.typography.body2,
+                    color = txtColor
+                )
+            }
+        }
     }

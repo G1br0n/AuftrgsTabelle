@@ -62,14 +62,21 @@ class AuftraegeViewModel(
     }
 
     fun addAuftrag(a: Auftrag) = scope.launch {
+        // DEBUG: prüfen, was das ViewModel gerade zum Insert bekommt
+        println("DEBUG ViewModel.addAuftrag: startDatum = ${a.startDatum}")
+
         repository.insertAuftrag(a)
         _auftraegeFlow.update { it + a }
     }
 
     fun updateAuftrag(a: Auftrag) = scope.launch {
+        // DEBUG: prüfen, was das ViewModel gerade zum Update bekommt
+        println("DEBUG ViewModel.updateAuftrag: startDatum = ${a.startDatum}")
+
         repository.updateAuftrag(a)
         _auftraegeFlow.update { list -> list.map { if (it.id == a.id) a else it } }
     }
+
 
     fun deleteAuftrag(id: String) = scope.launch {
         repository.deleteAuftrag(id)

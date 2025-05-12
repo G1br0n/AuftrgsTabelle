@@ -261,64 +261,110 @@
         // CRUD für Auftrag + Schichten
         fun insertAuftrag(a: Auftrag) {
             val sql = """
-                INSERT INTO auftrag(
-                    id, sapANummer, startDatum, endDatum,
-                    ort, strecke, kmVon, kmBis,
-                    massnahme, bemerkung
-                ) VALUES(?,?,?,?,?,?,?,?,?,?)
-            """.trimIndent()
+         INSERT INTO auftrag(
+             id, sapANummer, startDatum, endDatum,
+             ort, strecke, kmVon, kmBis,
+             massnahme, bemerkung
+         ) VALUES(?,?,?,?,?,?,?,?,?,?)
+     """.trimIndent()
             getConnection().use { conn ->
-                conn.prepareStatement(sql).use { stmt ->
-                    stmt.setString(1, a.id)
-                    stmt.setString(2, a.sapANummer)
-                    stmt.setString(3, a.startDatum?.toString())
-                    stmt.setString(4, a.endDatum?.toString())
-                    stmt.setString(5, a.ort)
-                    stmt.setString(6, a.strecke)
-                    stmt.setString(7, a.kmVon)
-                    stmt.setString(8, a.kmBis)
-                    stmt.setString(9, a.massnahme)
-                    stmt.setString(10, a.bemerkung)
-                    stmt.executeUpdate()
+
+                            conn.prepareStatement(sql).use { stmt ->
+                        stmt.setString(1, a.id)
+                        stmt.setString(2, a.sapANummer)
+                        stmt.setString(3, a.startDatum?.toString())
+                        stmt.setString(4, a.endDatum?.toString())
+                        stmt.setString(5, a.ort)
+                        stmt.setString(6, a.strecke)
+                        stmt.setString(7, a.kmVon)
+                        stmt.setString(8, a.kmBis)
+                        stmt.setString(9, a.massnahme)
+                        stmt.setString(10, a.bemerkung)
+                        stmt.executeUpdate()
+                                   // >>> DEBUG: prüfen, was wirklich in der DB gelandet ist
+                                    conn.prepareStatement("SELECT startDatum FROM auftrag WHERE id = ?").use { check ->
+                                            check.setString(1, a.id)
+                                            check.executeQuery().use { rs ->
+                                                    if (rs.next()) {
+                                                            println("DEBUG insertAuftrag: startDatum in DB = '${rs.getString("startDatum")}'")
+                                                       }
+                                                }
+                                        }
+                    }
+                    a.schichten?.forEach { schicht -> insertSchicht(conn, a.id, schicht) }
                 }
-                a.schichten?.forEach { schicht -> insertSchicht(conn, a.id, schicht) }
             }
-        }
 
         private fun insertSchicht(conn: Connection, auftragId: String, s: Schicht) {
             val sql = """
-            INSERT INTO schicht(
-                id, auftrag_id, startDatum, endDatum,
-                ort, strecke, kmVon, kmBis,
-                massnahme, bemerkung,  /*  ← Komma! */
-                pausenZeit             /*  neu   */
-            ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
-        """.trimIndent()
+        INSERT INTO schicht(
+            id, auftrag_id, startDatum, endDatum,
+            ort, strecke, kmVon, kmBis,
+            massnahme, bemerkung,
+            pausenZeit
+        ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+    """.trimIndent()
+
+            // 1) Schicht selbst einfügen
             conn.prepareStatement(sql).use { stmt ->
                 stmt.setString(1, s.id)
                 stmt.setString(2, auftragId)
                 stmt.setString(3, s.startDatum?.toString())
-                stmt.setString(4, s.endDatum  ?.toString())
+                stmt.setString(4, s.endDatum?.toString())
                 stmt.setString(5, s.ort)
                 stmt.setString(6, s.strecke)
                 stmt.setString(7, s.kmVon)
                 stmt.setString(8, s.kmBis)
                 stmt.setString(9, s.massnahme)
                 stmt.setString(10, s.bemerkung)
-                stmt.setInt   (11, s.pausenZeit)        // neu
+                stmt.setInt(11, s.pausenZeit)
                 stmt.executeUpdate()
+            }
+
+            // 2) Mitarbeiter-Zuordnung
+            s.mitarbeiter.orEmpty().forEach { p ->
+                conn.prepareStatement(
+                    "INSERT OR IGNORE INTO schicht_person(schicht_id, person_id) VALUES(?,?)"
+                ).use {
+                    it.setString(1, s.id)
+                    it.setString(2, p.id)
+                    it.executeUpdate()
+                }
+            }
+
+            // 3) Fahrzeug-Zuordnung
+            s.fahrzeug.orEmpty().forEach { f ->
+                conn.prepareStatement(
+                    "INSERT OR IGNORE INTO schicht_fahrzeug(schicht_id, fahrzeug_id) VALUES(?,?)"
+                ).use {
+                    it.setString(1, s.id)
+                    it.setString(2, f.id)
+                    it.executeUpdate()
+                }
+            }
+
+            // 4) Material-Zuordnung
+            s.material.orEmpty().forEach { m ->
+                conn.prepareStatement(
+                    "INSERT OR IGNORE INTO schicht_material(schicht_id, material_id) VALUES(?,?)"
+                ).use {
+                    it.setString(1, s.id)
+                    it.setString(2, m.id)
+                    it.executeUpdate()
+                }
             }
         }
 
 
+
         fun updateAuftrag(a: Auftrag) {
             val sql = """
-                UPDATE auftrag SET
-                    sapANummer=?, startDatum=?, endDatum=?,
-                    ort=?, strecke=?, kmVon=?, kmBis=?,
-                    massnahme=?, bemerkung=?
-                WHERE id=?
-            """.trimIndent()
+        UPDATE auftrag SET
+            sapANummer=?, startDatum=?, endDatum=?,
+            ort=?, strecke=?, kmVon=?, kmBis=?,
+            massnahme=?, bemerkung=?
+        WHERE id=?
+    """.trimIndent()
             getConnection().use { conn ->
                 conn.prepareStatement(sql).use { stmt ->
                     stmt.setString(1, a.sapANummer)
@@ -331,14 +377,29 @@
                     stmt.setString(8, a.massnahme)
                     stmt.setString(9, a.bemerkung)
                     stmt.setString(10, a.id)
+                    // Update ausführen
                     stmt.executeUpdate()
+
+                    // >>> DEBUG: prüfen, ob das Datum korrekt in der DB gelandet ist
+                    conn.prepareStatement("SELECT startDatum FROM auftrag WHERE id = ?").use { check ->
+                        check.setString(1, a.id)
+                        check.executeQuery().use { rs ->
+                            if (rs.next()) {
+                                println("DEBUG updateAuftrag: startDatum in DB = '${rs.getString("startDatum")}'")
+                            } else {
+                                println("DEBUG updateAuftrag: kein Auftrag mit id=${a.id} gefunden!")
+                            }
+                        }
+                    }
                 }
+
                 // Alte Schichten löschen
                 deleteSchichtenByAuftrag(conn, a.id)
                 // Neue Schichten einfügen
                 a.schichten?.forEach { insertSchicht(conn, a.id, it) }
             }
         }
+
 
         fun deleteAuftrag(id: String) {
             getConnection().use { conn ->
