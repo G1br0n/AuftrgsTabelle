@@ -31,10 +31,10 @@ fun AppContent() {
 }
 
 sealed class Screen(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector) {
-    object Auftraege : Screen("Aufträge", Icons.Filled.Menu)
-    object Mitarbeiter : Screen("Mitarbeiter", Icons.Filled.Person)
-    object Fahrzeuge : Screen("Fahrzeuge", Icons.Filled.Settings)
-    object Material : Screen("Materialien", Icons.Filled.Lock)
+    object Auftraege : Screen("📋 Aufträge", Icons.Filled.Menu)
+    object Mitarbeiter : Screen("👷🏼‍♂️ Mitarbeiter", Icons.Filled.Person)
+    object Fahrzeuge : Screen("🚘 Fahrzeuge", Icons.Filled.Settings)
+    object Material : Screen("🛠️ Materialien", Icons.Filled.Lock)
     object Qualification : Screen("Qualification", Icons.Filled.Lock)
     object Auswertung : Screen("Auswertung", Icons.Filled.Lock)
 }
@@ -55,7 +55,7 @@ fun NavigationBar(selected: Screen, onSelect: (Screen) -> Unit) {
             Screen.Material,
             ).forEach { screen ->
             GrayIconButton(
-                icon = screen.icon,
+
                 label = screen.label,
                 tooltip = screen.label,
                 selected = screen == selected,

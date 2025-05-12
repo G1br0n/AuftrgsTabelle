@@ -18,8 +18,7 @@
     import androidx.compose.ui.text.input.TextFieldValue
     import androidx.compose.ui.unit.DpSize
     import androidx.compose.ui.unit.dp
-    import androidx.compose.ui.window.Window
-    import androidx.compose.ui.window.rememberWindowState
+    import androidx.compose.ui.window.*
     import elemente.DatePickerField
     import elemente.DateTimePickerField
     import elemente.GrayIconButton
@@ -34,10 +33,10 @@
     import java.time.format.DateTimeParseException
     import java.util.*
 
-    enum class WiederholungsModus {
-        KEINE,            // einzelne / frei erfasste Schichten
-        TAEGLICH,         // täglich wiederholen (ggf. bis Enddatum)
-        HINTEREINANDER    // N Schichten lückenlos hintereinander
+    enum class WiederholungsModus(val label: String) {
+        KEINE("Kein"),
+        TAEGLICH("Täglich"),
+        HINTEREINANDER("Rund-Um")
     }
 
     private val GAP_XS = 2.dp   // minimal
@@ -209,25 +208,27 @@
         }
 
 
-        // Form-Fenster für Auftrag
+        // Form-Fenster für Auftrag (modal)
         if (showAuftragForm) {
-            Window(onCloseRequest = { showAuftragForm = false },
+            Dialog(
+                onCloseRequest = { showAuftragForm = false },
                 title = if (selectedAuftrag == null) "Neuer Auftrag" else "Auftrag bearbeiten",
-                state = windowState) {
+                state = rememberDialogState(width = 1000.dp, height = 800.dp)
+            ) {
                 AuftragForm(
                     initial = selectedAuftrag,
                     onSave = { id, sap, ort, strecke, kmVon, kmBis,
                                massnahme, bemerkung, lieferDatum,
                                modus,
                                startDate, startTime,
-                               endDate,   endTime,
+                               endDate, endTime,
                                anzahl, dauer ->
 
                         // 1) Basis-Auftrag bauen
                         val basis = Auftrag(
                             id         = id ?: UUID.randomUUID().toString(),
                             sapANummer = sap,
-                            startDatum = lieferDatum, // optionales Lieferdatum
+                            startDatum = lieferDatum,
                             endDatum   = null,
                             ort        = ort,
                             strecke    = strecke,
@@ -293,35 +294,30 @@
                     },
                     onCancel = { showAuftragForm = false }
                 )
-
-
-
             }
         }
 
-        // Form-Fenster für Schicht
+
+        // Form-Fenster für Schicht (modal)
         if (showSchichtForm && selectedAuftrag != null) {
-            Window(onCloseRequest = { showSchichtForm = false },
+            Dialog(
+                onCloseRequest = { showSchichtForm = false },
                 title = if (selectedSchicht == null) "Neue Schicht" else "Schicht bearbeiten",
-                state = windowState
+                state = rememberDialogState(width = 1200.dp, height = 800.dp)
             ) {
                 SchichtForm(
                     initial  = selectedSchicht,
                     onSave   = { neueSchicht ->
                         if (selectedSchicht == null) viewModel.addSchicht(selectedAuftrag.id, neueSchicht)
                         else                          viewModel.updateSchicht(neueSchicht.id, neueSchicht)
-                        showSchichtForm   = false
+                        showSchichtForm = false
                         selectedSchichtId = neueSchicht.id
                     },
-                    onDelete = selectedSchicht?.let { schicht ->
-                        {
-                            // 1. Schicht aus DB löschen
-                            viewModel.deleteSchicht(selectedAuftrag.id, schicht.id)
-                            // 2. Formular schließen und Selektion zurücksetzen
-                            showSchichtForm   = false
-                            selectedSchichtId = null
-                        }
-                    },
+                    onDelete = selectedSchicht?.let { {
+                        viewModel.deleteSchicht(selectedAuftrag.id, it.id)
+                        showSchichtForm = false
+                        selectedSchichtId = null
+                    } },
                     onCancel = { showSchichtForm = false },
                     vm       = viewModel
                 )
@@ -399,22 +395,11 @@
     fun AuftragForm(
         initial: Auftrag?,
         onSave: (
-            id: String?,
-            sap: String,
-            ort: String,
-            strecke: String,
-            kmVon: String,
-            kmBis: String,
-            massnahme: String,
-            bemerkung: String,
-            lieferDatum: LocalDateTime?,
-            modus: WiederholungsModus,
-            startDate: LocalDate?,
-            startTime: LocalTime?,
-            endDate: LocalDate?,
-            endTime: LocalTime?,
-            anzahl: Int?,
-            dauer: Long?
+            id: String?, sap: String, ort: String, strecke: String,
+            kmVon: String, kmBis: String, massnahme: String, bemerkung: String,
+            lieferDatum: LocalDateTime?, modus: WiederholungsModus,
+            startDate: LocalDate?, startTime: LocalTime?,
+            endDate: LocalDate?, endTime: LocalTime?, anzahl: Int?, dauer: Long?
         ) -> Unit,
         onDelete: (() -> Unit)? = null,
         onCancel: () -> Unit,
@@ -422,45 +407,42 @@
     ) {
         val dateTimeFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
 
-        // States
-        var sapVal       by remember { mutableStateOf(initial?.sapANummer.orEmpty()) }
-        var ortVal       by remember { mutableStateOf(initial?.ort.orEmpty()) }
-        var streckeVal   by remember { mutableStateOf(initial?.strecke.orEmpty()) }
-        var kmVonVal     by remember { mutableStateOf(initial?.kmVon.orEmpty()) }
-        var kmBisVal     by remember { mutableStateOf(initial?.kmBis.orEmpty()) }
+        // Internal state
+        var sapVal by remember { mutableStateOf(initial?.sapANummer.orEmpty()) }
+        var ortVal by remember { mutableStateOf(initial?.ort.orEmpty()) }
+        var streckeVal by remember { mutableStateOf(initial?.strecke.orEmpty()) }
+        var kmVonVal by remember { mutableStateOf(initial?.kmVon.orEmpty()) }
+        var kmBisVal by remember { mutableStateOf(initial?.kmBis.orEmpty()) }
         var massnahmeVal by remember { mutableStateOf(initial?.massnahme.orEmpty()) }
         var bemerkungVal by remember { mutableStateOf(initial?.bemerkung.orEmpty()) }
-        var lieferDatum  by remember { mutableStateOf(initial?.startDatum) }
+        var lieferDatum by remember { mutableStateOf(initial?.startDatum) }
 
-        var modus        by remember { mutableStateOf(WiederholungsModus.KEINE) }
-        var startDate    by remember { mutableStateOf(initial?.startDatum?.toLocalDate()) }
-        var startTime    by remember { mutableStateOf(initial?.startDatum?.toLocalTime()) }
-        var endDate      by remember { mutableStateOf(initial?.endDatum?.toLocalDate()) }
-        var endTime      by remember { mutableStateOf(initial?.endDatum?.toLocalTime()) }
-        var anzahlVal    by remember { mutableStateOf("") }
-        var dauerVal     by remember { mutableStateOf(
-            initial?.schichten?.firstOrNull()?.let { sch ->
-                sch.startDatum?.let { s ->
-                    sch.endDatum?.hour?.minus(s.hour)?.toString()
-                }
-            } ?: "8"
-        ) }
+        var modus by remember { mutableStateOf(WiederholungsModus.KEINE) }
+        var startDate by remember { mutableStateOf(initial?.startDatum?.toLocalDate()) }
+        var startTime by remember { mutableStateOf(initial?.startDatum?.toLocalTime()) }
+        var endDate by remember { mutableStateOf(initial?.endDatum?.toLocalDate()) }
+        var endTime by remember { mutableStateOf(initial?.endDatum?.toLocalTime()) }
+        var anzahlVal by remember { mutableStateOf("") }
+        var dauerVal by remember { mutableStateOf(initial?.schichten?.firstOrNull()?.let { sch ->
+            sch.startDatum?.hour?.let { h -> sch.endDatum?.hour?.minus(h) }?.toString()
+        } ?: "8") }
 
         val canSave = sapVal.isNotBlank()
 
         Column(
-            modifier = Modifier
+            Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Obere Zeile: Titel und Auftragsfelder
+            // Row with two columns: details and repetition inputs
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // Left column: Auftrag details
                 Column(
-                    modifier = Modifier.weight(1f),
+                    Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
@@ -468,53 +450,35 @@
                         style = MaterialTheme.typography.subtitle1
                     )
                     OutlinedTextField(
-                        value = sapVal,
-                        onValueChange = { sapVal = it },
-                        label = { Text("SAP-A-Nummer") },
-                        modifier = Modifier.fillMaxWidth()
+                        value = sapVal, onValueChange = { sapVal = it },
+                        label = { Text("SAP-A-Nummer") }, modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = ortVal,
-                        onValueChange = { ortVal = it },
-                        label = { Text("Ort") },
-                        modifier = Modifier.fillMaxWidth()
+                        value = ortVal, onValueChange = { ortVal = it },
+                        label = { Text("Ort") }, modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = streckeVal,
-                        onValueChange = { streckeVal = it },
-                        label = { Text("Strecke") },
-                        modifier = Modifier.fillMaxWidth()
+                        value = streckeVal, onValueChange = { streckeVal = it },
+                        label = { Text("Strecke") }, modifier = Modifier.fillMaxWidth()
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedTextField(
-                            value = kmVonVal,
-                            onValueChange = { kmVonVal = it },
-                            label = { Text("Km von") },
-                            modifier = Modifier.weight(1f)
+                            value = kmVonVal, onValueChange = { kmVonVal = it },
+                            label = { Text("Km von") }, modifier = Modifier.weight(1f)
                         )
                         OutlinedTextField(
-                            value = kmBisVal,
-                            onValueChange = { kmBisVal = it },
-                            label = { Text("Km bis") },
-                            modifier = Modifier.weight(1f)
+                            value = kmBisVal, onValueChange = { kmBisVal = it },
+                            label = { Text("Km bis") }, modifier = Modifier.weight(1f)
                         )
                     }
                     OutlinedTextField(
-                        value = massnahmeVal,
-                        onValueChange = { massnahmeVal = it },
-                        label = { Text("Maßnahme") },
-                        modifier = Modifier.fillMaxWidth()
+                        value = massnahmeVal, onValueChange = { massnahmeVal = it },
+                        label = { Text("Maßnahme") }, modifier = Modifier.fillMaxWidth()
                     )
                     OutlinedTextField(
-                        value = bemerkungVal,
-                        onValueChange = { bemerkungVal = it },
-                        label = { Text("Bemerkung") },
-                        modifier = Modifier.fillMaxWidth()
+                        value = bemerkungVal, onValueChange = { bemerkungVal = it },
+                        label = { Text("Bemerkung") }, modifier = Modifier.fillMaxWidth()
                     )
-                    // DateTimePickerField für Lieferdatum & Uhrzeit
                     DateTimePickerField(
                         label = "Liefer-Datum & Zeit (optional)",
                         initialDateTime = lieferDatum,
@@ -522,111 +486,101 @@
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-            }
 
-            // Wiederholungsmodus und Details nur anzeigen, wenn aktiv
-            if (modus != WiederholungsModus.KEINE) {
+                // Right column: repetition settings
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    Modifier.weight(1f),
+
                 ) {
+
                     Text("Wiederholungsmodus", style = MaterialTheme.typography.subtitle1)
-                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         WiederholungsModus.values().forEach { m ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 RadioButton(selected = modus == m, onClick = { modus = m })
-                                Text(text = m.name.lowercase().replaceFirstChar { it.uppercase() })
+                                Spacer(Modifier.width(4.dp))
+                                Text(m.name.lowercase().replaceFirstChar { it.uppercase() })
                             }
                         }
                     }
-                    // Zeitraum-Eingaben nebeneinander
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        DatePickerField(
-                            label = "Start-Datum",
-                            selectedDate = startDate,
-                            onDateSelected = { startDate = it },
-                            modifier = Modifier.weight(1f)
-                        )
-                        TimePickerField(
-                            label = "Start-Zeit",
-                            selectedTime = startTime,
-                            onTimeSelected = { startTime = it },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    if (modus == WiederholungsModus.TAEGLICH) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
+                    if (modus != WiederholungsModus.KEINE) {
+                        // Zeitraum inputs
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             DatePickerField(
-                                label = "End-Datum",
-                                selectedDate = endDate,
-                                onDateSelected = { endDate = it },
+                                label = "Start-Datum",
+                                selectedDate = startDate,
+                                onDateSelected = { startDate = it },
                                 modifier = Modifier.weight(1f)
                             )
                             TimePickerField(
-                                label = "End-Zeit",
-                                selectedTime = endTime,
-                                onTimeSelected = { endTime = it },
+                                label = "Start-Zeit",
+                                selectedTime = startTime,
+                                onTimeSelected = { startTime = it },
                                 modifier = Modifier.weight(1f)
                             )
                         }
-                    } else {
+                        if (modus == WiederholungsModus.TAEGLICH) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                DatePickerField(
+                                    label = "End-Datum",
+                                    selectedDate = endDate,
+                                    onDateSelected = { endDate = it },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                TimePickerField(
+                                    label = "End-Zeit",
+                                    selectedTime = endTime,
+                                    onTimeSelected = { endTime = it },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        } else {
+                            OutlinedTextField(
+                                value = anzahlVal, onValueChange = { anzahlVal = it },
+                                label = { Text("Anzahl Schichten") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
                         OutlinedTextField(
-                            value = anzahlVal,
-                            onValueChange = { anzahlVal = it },
-                            label = { Text("Anzahl Schichten") },
+                            value = dauerVal, onValueChange = { dauerVal = it },
+                            label = { Text("Dauer je Schicht (h)") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
-                    OutlinedTextField(
-                        value = dauerVal,
-                        onValueChange = { dauerVal = it },
-                        label = { Text("Dauer je Schicht (h)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
                 }
             }
 
-            // Aktion-Buttons stets unten
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            // Rest: action buttons
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onCancel) { Text("Abbrechen") }
                 onDelete?.let { OutlinedButton(onClick = it) { Text("Löschen") } }
-                Spacer(modifier = Modifier.weight(1f))
+                Spacer(Modifier.weight(1f))
                 Button(
                     enabled = canSave,
                     onClick = {
                         onSave(
                             initial?.id,
-                            sapVal.trim(),
-                            ortVal.trim(),
-                            streckeVal.trim(),
-                            kmVonVal.trim(),
-                            kmBisVal.trim(),
-                            massnahmeVal.trim(),
-                            bemerkungVal.trim(),
+                            sapVal.trim(), ortVal.trim(), streckeVal.trim(),
+                            kmVonVal.trim(), kmBisVal.trim(), massnahmeVal.trim(), bemerkungVal.trim(),
                             lieferDatum,
                             modus,
                             startDate, startTime,
                             if (modus == WiederholungsModus.TAEGLICH) endDate else null,
                             if (modus == WiederholungsModus.TAEGLICH) endTime else null,
-                            anzahlVal.toIntOrNull(),
-                            dauerVal.toLongOrNull()
+                            anzahlVal.toIntOrNull(), dauerVal.toLongOrNull()
                         )
                     }
                 ) { Text("Speichern") }
             }
         }
     }
+
     /* ==================================================================
     *  view/SchichtForm.kt          (ersetzt alte Fassung)
     * ================================================================== */
@@ -677,6 +631,9 @@
         val endErr   = endDate == null || endTime == null
         val pauseErr = pauseVal.toIntOrNull() == null
         val pauseMin = pauseVal.toIntOrNull() ?: 0
+
+
+
 
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Text(
@@ -1100,33 +1057,21 @@
     ) {
         var selected by remember { mutableStateOf(preSel.toMutableSet()) }
 
-        val windowState = rememberWindowState(
-            size = DpSize(width = 600.dp, height = 1100.dp)
-        )
-
-        Window(
+        // Modal-Dialog statt Window
+        Dialog(
             onCloseRequest = { onResult(null) },
             title = title,
-            state = windowState
+            state = rememberDialogState(width = 600.dp, height = 600.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(8.dp)
             ) {
-                // 1) Überschrift mit Zähler
-                Text(
-                    text = "$title (${selected.size} ausgewählt)",
-                    style = MaterialTheme.typography.h6
-                )
+                Text("$title (${selected.size} ausgewählt)", style = MaterialTheme.typography.h6)
                 Spacer(Modifier.height(8.dp))
 
-                // 2) Der scrollbare Bereich, nimmt genau den Rest des Platzes
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
-                ) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     LazyColumn {
                         items(items) { item ->
                             val isChecked = selected.contains(item)
@@ -1134,9 +1079,8 @@
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clickable {
-                                        selected = selected.toMutableSet().apply {
-                                            if (isChecked) remove(item) else add(item)
-                                        }
+                                        if (isChecked) selected.remove(item)
+                                        else selected.add(item)
                                     }
                                     .padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
@@ -1144,9 +1088,8 @@
                                 Checkbox(
                                     checked = isChecked,
                                     onCheckedChange = { checked ->
-                                        selected = selected.toMutableSet().apply {
-                                            if (checked) add(item) else remove(item)
-                                        }
+                                        if (checked) selected.add(item)
+                                        else selected.remove(item)
                                     }
                                 )
                                 Spacer(Modifier.width(8.dp))
@@ -1159,10 +1102,8 @@
                 Divider()
                 Spacer(Modifier.height(8.dp))
 
-                // 3) Die Buttons, immer unten sichtbar
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth(),
+                    Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
                     OutlinedButton(onClick = { onResult(null) }) {
@@ -1176,4 +1117,3 @@
             }
         }
     }
-
