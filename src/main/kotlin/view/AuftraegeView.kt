@@ -137,69 +137,67 @@
 
             }
 
-            Spacer(Modifier.width(GAP_M))
+
 
             /* Detailansicht */
-            Column(Modifier.weight(5f)) {
-                Text("Details", style = MaterialTheme.typography.h6)
+            Column(Modifier.weight(5f).padding(start = 18.dp)) {
+
                 Spacer(Modifier.height(GAP_S))
 
                 selectedSchicht?.let { s ->
-                    /** kleine Helper zum hübschen Formatieren */
-                    fun List<Any?>?.toLabelList(label: (Any) -> String): String =
+                    // 1) Bearbeiten-Button oben
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+
+                    ) {
+                        GrayIconButton(
+                            icon     = Icons.Default.Edit,
+                            label    = "Bearbeiten",
+                            tooltip  = "Schicht bearbeiten",
+                            selected = false,
+                            onClick  = { showSchichtForm = true }
+                        )
+                    }
+                    Spacer(Modifier.width(GAP_M))
+                    Text("Details", style = MaterialTheme.typography.h6)
+
+                    // 2) Helpers zum sicheren Formatieren
+                    fun <T> List<T>?.toLabelList(label: (T) -> String): String =
                         this?.takeIf { it.isNotEmpty() }
-                            ?.joinToString("\n") { "•${label(it as Any)}" }
-                    ?: "—"
+                            ?.joinToString("\n") { "• ${label(it)}" }
+                            ?: "–"
 
-                    val personenTxt = s.mitarbeiter.toLabelList {
-                        it as Person; "${it.vorname} ${it.name}".trim()
-                    }
-                    val fahrzeugeTxt = s.fahrzeug.toLabelList {
-                        it as Fahrzeug; it.bezeichnung ?: "—"
-                    }
-                    val materialTxt = s.material.toLabelList {
-                        it as Material; it.bezeichnung ?: "—"
-                    }
+                    val personenTxt  = s.mitarbeiter.toLabelList { "${it.vorname} ${it.name}".trim() }
+                    val fahrzeugeTxt = s.fahrzeug.toLabelList   { it.bezeichnung.orEmpty() }
+                    val materialTxt  = s.material.toLabelList   { it.bezeichnung.orEmpty() }
 
-                    // Details in einer LazyColumn
+                    // 3) Die eigentliche Detail-Liste
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(GAP_S)
                     ) {
-                        items(listOf(
-                            "Start"       to s.startDatum?.format(dateTimeFmt).orEmpty(),
-                            "Ende"        to s.endDatum?.format(dateTimeFmt).orEmpty(),
-                            "Ort"         to s.ort.orEmpty(),
-                            "Strecke"     to s.strecke.orEmpty(),
-                            "Km"          to "${s.kmVon.orEmpty()} – ${s.kmBis.orEmpty()}",
-                            "Maßnahme"    to s.massnahme.orEmpty(),
-                            "Mitarbeiter" to personenTxt,
-                            "Fahrzeuge"   to fahrzeugeTxt,
-                            "Material"    to materialTxt,
-                            "Bemerkung"   to s.bemerkung.orEmpty()
-                        )) { (k, v) ->
-                            Text("$k:", style = MaterialTheme.typography.subtitle2)
-                            Text(v,    style = MaterialTheme.typography.body2)
-                        }
-                        // Spacer, damit Edit-Button am Ende bleibt
-                        item {
-                            Spacer(Modifier.weight(1f))
-                        }
-                        item {
-                            GrayIconButton(
-                                Icons.Default.Edit,
-                                "Bearbeiten",
-                                "Schicht bearbeiten",
-                                selected = false,
-                                onClick  = { showSchichtForm = true },
-                                modifier = Modifier
-                                    .align(Alignment.CenterHorizontally)
-                                    .padding(top = GAP_L)
+                        items(
+                            listOf(
+                                "Start"       to s.startDatum?.format(dateTimeFmt).orEmpty().ifBlank { "–" },
+                                "Ende"        to s.endDatum?.format(dateTimeFmt).orEmpty().ifBlank { "–" },
+                                "Ort"         to s.ort.orEmpty().ifBlank { "–" },
+                                "Strecke"     to s.strecke.orEmpty().ifBlank { "–" },
+                                "Km"          to listOf(s.kmVon, s.kmBis).joinToString(" – ") { it.orEmpty() }.ifBlank { "–" },
+                                "Maßnahme"    to s.massnahme.orEmpty().ifBlank { "–" },
+                                "Mitarbeiter" to personenTxt,
+                                "Fahrzeuge"   to fahrzeugeTxt,
+                                "Material"    to materialTxt,
+                                "Bemerkung"   to s.bemerkung.orEmpty().ifBlank { "–" }
                             )
+                        ) { (label, value) ->
+                            Text(text = "$label:", style = MaterialTheme.typography.subtitle2)
+                            Text(text = value, style = MaterialTheme.typography.body2)
                         }
                     }
                 } ?: Text("Keine Schicht ausgewählt", color = Color.Gray)
             }
+
         }
 
 
@@ -1096,7 +1094,7 @@
         } else {
             "–"
         }
-        val mitarbeiterCount = schicht.mitarbeiter?.size ?: 0
+        val mitarbeiterCount = schicht.mitarbeiter.size ?: 0
 
         Card(
             modifier = Modifier
@@ -1116,30 +1114,38 @@
                 )
                 Spacer(Modifier.height(4.dp))
                 // Startdatum und Uhrzeit
-                Text(
-                    text = "Start: ${start?.format(dateFmt).orEmpty()}",
-                    style = MaterialTheme.typography.body2,
-                    color = txtColor
-                )
-                // Endedatum und Uhrzeit
-                Text(
-                    text = "Ende:  ${ende?.format(dateFmt).orEmpty()}",
-                    style = MaterialTheme.typography.body2,
-                    color = txtColor
-                )
+                Row {
+                    Column {
+                        Text(
+                            text = "Start: ${start?.format(dateFmt).orEmpty()}",
+                            style = MaterialTheme.typography.body2,
+                            color = txtColor
+                        )
+                        // Endedatum und Uhrzeit
+                        Text(
+                            text = "Ende:  ${ende?.format(dateFmt).orEmpty()}",
+                            style = MaterialTheme.typography.body2,
+                            color = txtColor
+                        )
+                    }
+                    Column {
+                        // Pause
+                        Text(
+                            text = "Pause: ${pauseMin}m",
+                            style = MaterialTheme.typography.body2,
+                            color = txtColor
+                        )
+                        // Netto-Stunden
+                        Text(
+                            text = "Netto: $durationText",
+                            style = MaterialTheme.typography.body2,
+                            color = txtColor
+                        )
+                    }
+                }
+
                 Spacer(Modifier.height(4.dp))
-                // Pause
-                Text(
-                    text = "Pause: ${pauseMin}m",
-                    style = MaterialTheme.typography.body2,
-                    color = txtColor
-                )
-                // Netto-Stunden
-                Text(
-                    text = "Netto: $durationText",
-                    style = MaterialTheme.typography.body2,
-                    color = txtColor
-                )
+
                 Spacer(Modifier.height(4.dp))
                 // Anzahl Mitarbeiter
                 Text(
