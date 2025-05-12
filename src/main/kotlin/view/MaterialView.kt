@@ -87,7 +87,7 @@ fun MaterialView(
                     )
                 } else {
                     selected?.let { m ->
-                        Text("Bemerkung:", style = MaterialTheme.typography.h6)
+                        Text("Bemerkung: ${m.bezeichnung}", style = MaterialTheme.typography.h6)
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = bemerkungText,

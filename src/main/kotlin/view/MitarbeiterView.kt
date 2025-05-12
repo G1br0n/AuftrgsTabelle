@@ -120,7 +120,7 @@ fun MitarbeiterView(
                     )
                 } else {
                     selected?.let { p ->
-                        Text("Bemerkung:", style = MaterialTheme.typography.h6)
+                        Text("Bemerkung: ${p.vorname} ${p.name}", style = MaterialTheme.typography.h6)
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = bemerkungText,

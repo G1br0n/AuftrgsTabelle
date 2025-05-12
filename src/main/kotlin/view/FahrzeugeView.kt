@@ -112,7 +112,7 @@ fun FahrzeugeView(
                     )
                 } else {
                     selected?.let { f ->
-                        Text("Bemerkung:", style = MaterialTheme.typography.h6)
+                        Text("Bemerkung: ${f.bezeichnung} ${f.kennzeichen}", style = MaterialTheme.typography.h6)
                         Spacer(Modifier.height(8.dp))
                         OutlinedTextField(
                             value = bemerkungText,
