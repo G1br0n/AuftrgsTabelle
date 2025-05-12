@@ -243,9 +243,25 @@
                         val dauerStd = dauer ?: 8L
 
                         if (modus == WiederholungsModus.KEINE) {
-                            if (selectedAuftrag == null) viewModel.addAuftrag(basis)
-                            else                      viewModel.updateAuftrag(basis.copy(id = selectedAuftrag.id))
-                        } else {
+                            if (selectedAuftrag == null) {
+                                viewModel.addAuftrag(basis)
+                            } else {
+                                // Alte Schichten beibehalten:
+                                val updated = selectedAuftrag.copy(
+                                    sapANummer = sap,
+                                    startDatum = lieferDatum?.toLocalDateTimeOrNull(),
+                                    ort        = ort,
+                                    strecke    = strecke,
+                                    kmVon      = kmVon,
+                                    kmBis      = kmBis,
+                                    massnahme  = massnahme,
+                                    bemerkung  = bemerkung
+                                    // schichten bleibt unverändert
+                                )
+                                viewModel.updateAuftrag(updated)
+                            }
+                        }
+                        else {
                             viewModel.addAuftragAutomatisch(
                                 basis  = basis,
                                 modus  = modus,
