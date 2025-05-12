@@ -1169,7 +1169,6 @@
         preSel: Set<T> = emptySet(),
         onResult: (Set<T>?) -> Unit
     ) {
-        // State: ausgewählte Elemente als Snapshot-State
         var selected by remember { mutableStateOf(preSel.toMutableSet()) }
 
         val windowState = rememberWindowState(
@@ -1182,47 +1181,59 @@
             state = windowState
         ) {
             Column(
-                Modifier
+                modifier = Modifier
                     .fillMaxSize()
-                    .padding(4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .padding(8.dp)
             ) {
-                Text("$title (${selected.size} ausgewählt)", style = MaterialTheme.typography.h6)
+                // 1) Überschrift mit Zähler
+                Text(
+                    text = "$title (${selected.size} ausgewählt)",
+                    style = MaterialTheme.typography.h6
+                )
+                Spacer(Modifier.height(8.dp))
 
-                LazyColumn(
+                // 2) Der scrollbare Bereich, nimmt genau den Rest des Platzes
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
                         .weight(1f)
+                        .fillMaxWidth()
                 ) {
-                    items(items) { item ->
-                        val isChecked = selected.contains(item)
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    selected = selected.toMutableSet().apply {
-                                        if (isChecked) remove(item) else add(item)
+                    LazyColumn {
+                        items(items) { item ->
+                            val isChecked = selected.contains(item)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        selected = selected.toMutableSet().apply {
+                                            if (isChecked) remove(item) else add(item)
+                                        }
                                     }
-                                }
-                                .padding(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Checkbox(
-                                checked = isChecked,
-                                onCheckedChange = { checked ->
-                                    selected = selected.toMutableSet().apply {
-                                        if (checked) add(item) else remove(item)
+                                    .padding(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = { checked ->
+                                        selected = selected.toMutableSet().apply {
+                                            if (checked) add(item) else remove(item)
+                                        }
                                     }
-                                }
-                            )
-                            Spacer(Modifier.width(4.dp))
-                            Text(label(item))
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(label(item))
+                            }
                         }
                     }
                 }
 
+                Divider()
+                Spacer(Modifier.height(8.dp))
+
+                // 3) Die Buttons, immer unten sichtbar
                 Row(
-                    Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
                     OutlinedButton(onClick = { onResult(null) }) {
@@ -1236,3 +1247,4 @@
             }
         }
     }
+
