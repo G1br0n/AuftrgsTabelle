@@ -787,14 +787,26 @@
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     GrayIconButton(
-                        Icons.Default.Person, "Mitarbeiter auswählen", "Dialog öffnen", false
-                    , { showPersonDlg = true })
+                        icon = Icons.Default.Person,
+                        label = "Mitarbeiter wählen",
+                        tooltip = "Dialog öffnen",
+                        selected = false,
+                        onClick = { showPersonDlg = true }
+                    )
                     GrayIconButton(
-                        Icons.Default.Build, "Material auswählen", "Dialog öffnen", false
-                    , { showMaterialDlg = true })
+                        icon = Icons.Default.Build,
+                        label = "Material wählen",
+                        tooltip = "Dialog öffnen",
+                        selected = false,
+                        onClick = { showMaterialDlg = true }
+                    )
                     GrayIconButton(
-                        Icons.Default.Settings, "Fahrzeuge auswählen", "Dialog öffnen", false
-                    , { showFahrzeugDlg = true })
+                        icon = Icons.Default.Settings,
+                        label = "Fahrzeuge wählen",
+                        tooltip = "Dialog öffnen",
+                        selected = false,
+                        onClick = { showFahrzeugDlg = true }
+                    )
                 }
             }
 
@@ -848,27 +860,35 @@
             }
 
             // Picker‑Dialoge
-            if (showPersonDlg) MultiSelectDialog(
+            if (showPersonDlg) MultiSelectWindow(
                 title   = "Mitarbeiter auswählen",
                 items   = vm.personen,
-                label   = { "${it.vorname} ${it.name}".trim() },
-                preSel  = personsSel,
-                onClose = { it?.let { personsSel = it }; showPersonDlg = false }
-            )
-            if (showMaterialDlg) MultiSelectDialog(
+                label   = { "${it.vorname} ${it.name}" },
+                preSel  = personsSel
+            ) { result ->
+                result?.let { personsSel = it }
+                showPersonDlg = false
+            }
+
+            if (showMaterialDlg) MultiSelectWindow(
                 title   = "Material auswählen",
                 items   = vm.material,
-                label   = { it.bezeichnung ?: "—" },
-                preSel  = materialSel,
-                onClose = { it?.let { materialSel = it }; showMaterialDlg = false }
-            )
-            if (showFahrzeugDlg) MultiSelectDialog(
+                label   = { it.bezeichnung ?: "–" },
+                preSel  = materialSel
+            ) { result ->
+                result?.let { materialSel = it }
+                showMaterialDlg = false
+            }
+
+            if (showFahrzeugDlg) MultiSelectWindow(
                 title   = "Fahrzeuge auswählen",
                 items   = vm.fahrzeuge,
-                label   = { it.bezeichnung ?: "—" },
-                preSel  = fahrzeugeSel,
-                onClose = { it?.let { fahrzeugeSel = it }; showFahrzeugDlg = false }
-            )
+                label   = { it.bezeichnung ?: "–" },
+                preSel  = fahrzeugeSel
+            ) { result ->
+                result?.let { fahrzeugeSel = it }
+                showFahrzeugDlg = false
+            }
         }
     }
 
@@ -1127,6 +1147,86 @@
                     style = MaterialTheme.typography.body2,
                     color = txtColor
                 )
+            }
+        }
+    }
+
+
+    /**
+     * Ein neues Multi-Select-Fenster mit fester Höhe und Zähler oben.
+     */
+    @Composable
+    fun <T> MultiSelectWindow(
+        title: String,
+        items: List<T>,
+        label: (T) -> String,
+        preSel: Set<T> = emptySet(),
+        onResult: (Set<T>?) -> Unit
+    ) {
+        // State: ausgewählte Elemente als Snapshot-State
+        var selected by remember { mutableStateOf(preSel.toMutableSet()) }
+
+        val windowState = rememberWindowState(
+            size = DpSize(width = 600.dp, height = 1100.dp)
+        )
+
+        Window(
+            onCloseRequest = { onResult(null) },
+            title = title,
+            state = windowState
+        ) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text("$title (${selected.size} ausgewählt)", style = MaterialTheme.typography.h6)
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    items(items) { item ->
+                        val isChecked = selected.contains(item)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selected = selected.toMutableSet().apply {
+                                        if (isChecked) remove(item) else add(item)
+                                    }
+                                }
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = isChecked,
+                                onCheckedChange = { checked ->
+                                    selected = selected.toMutableSet().apply {
+                                        if (checked) add(item) else remove(item)
+                                    }
+                                }
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            Text(label(item))
+                        }
+                    }
+                }
+
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    OutlinedButton(onClick = { onResult(null) }) {
+                        Text("Abbrechen")
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    Button(onClick = { onResult(selected) }) {
+                        Text("Übernehmen")
+                    }
+                }
             }
         }
     }
