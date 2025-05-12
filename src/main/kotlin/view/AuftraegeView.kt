@@ -6,6 +6,7 @@
     import androidx.compose.foundation.clickable
     import androidx.compose.foundation.layout.*
     import androidx.compose.foundation.lazy.LazyColumn
+    import androidx.compose.foundation.lazy.items
     import androidx.compose.foundation.lazy.itemsIndexed
     import androidx.compose.material.*
     import androidx.compose.material.icons.Icons
@@ -15,12 +16,13 @@
     import androidx.compose.ui.Modifier
     import androidx.compose.ui.graphics.Color
     import androidx.compose.ui.text.input.TextFieldValue
+    import androidx.compose.ui.unit.DpSize
     import androidx.compose.ui.unit.dp
     import androidx.compose.ui.window.Window
+    import androidx.compose.ui.window.rememberWindowState
     import elemente.GrayFillButton
     import elemente.GrayIconButton
-    import models.Auftrag
-    import models.Schicht
+    import models.*
     import viewModel.AuftraegeViewModel
     import java.time.Duration
     import java.time.LocalDate
@@ -35,13 +37,31 @@
     private val GAP_M  = 8.dp
     private val GAP_L  = 12.dp  // etwas größer
 
+
+
     @Composable
     fun AuftraegeView(
         viewModel: AuftraegeViewModel = remember { AuftraegeViewModel() }
     ) {
+
+        val windowState = rememberWindowState(
+            size = DpSize(width = 1200.dp, height = 900.dp)
+        )
+
         val auftraege by viewModel.auftraegeFlow.collectAsState(emptyList())
-        var selectedAuftrag by remember { mutableStateOf<Auftrag?>(null) }
-        var selectedSchicht by remember { mutableStateOf<Schicht?>(null) }
+
+        // Auswahl nur über IDs
+        var selectedAuftragId by remember { mutableStateOf<String?>(null) }
+        var selectedSchichtId by remember { mutableStateOf<String?>(null) }
+
+        // Dynamisch aktuelles Objekt ermitteln
+        val selectedAuftrag = selectedAuftragId?.let { id ->
+            auftraege.find { it.id == id }
+        }
+        val selectedSchicht = selectedSchichtId?.let { sid ->
+            selectedAuftrag?.schichten?.find { it.id == sid }
+        }
+
         var showAuftragForm by remember { mutableStateOf(false) }
         var showSchichtForm by remember { mutableStateOf(false) }
 
@@ -50,182 +70,243 @@
         Row(
             Modifier
                 .fillMaxSize()
-                .padding(GAP_M)                     // vorher 16 dp
+                .padding(GAP_M)
         ) {
-
-            /* ---------------- Auftrags‑Liste ---------------- */
+            /* Auftragsliste */
             Column(Modifier.weight(3f)) {
-                GrayIconButton(Icons.Default.Add,"Auftrag","Neuen Auftrag",false, onClick = {
-                    selectedAuftrag = null; showAuftragForm = true
+                GrayIconButton(Icons.Default.Add, "Auftrag", "Neuen Auftrag", false, onClick = {
+                    selectedAuftragId = null
+                    showAuftragForm = true
                 })
                 Spacer(Modifier.height(GAP_S))
                 Text("Auftragsliste", style = MaterialTheme.typography.h6)
                 Spacer(Modifier.height(GAP_XS))
-                /* ---------------------------------- */
-                /*  Auftrags‑Liste (geänderte Stelle) */
-                /* ---------------------------------- */
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(GAP_S)) {
-                    itemsIndexed(auftraege) { i, a ->
+                    items(
+                        items = auftraege,
+                        key = { it.id }
+                    ) { a ->
+                        val isSelected = a.id == selectedAuftragId
                         AuftragCard(
-                            auftrag   = a,
-                            index     = i + 1,
-                            selected  = a == selectedAuftrag,
-                            onSelect  = { selectedAuftrag = a; selectedSchicht = null },
-                            onEdit    = {                   // ⬅️ NEU
-                                selectedAuftrag = a
-                                showAuftragForm = true      // Formular im Edit‑Modus anzeigen
+                            auftrag = a,
+                            index = auftraege.indexOf(a) + 1,
+                            selected = isSelected,
+                            onSelect = {
+                                selectedAuftragId = a.id
+                                selectedSchichtId = null
                             },
-                            modifier  = Modifier
+                            onEdit = {
+                                selectedAuftragId = a.id
+                                showAuftragForm = true
+                            },
+                            modifier = Modifier
                                 .fillMaxWidth()
                                 .animateContentSize()
                         )
-                        Spacer(Modifier.height(GAP_S))
                     }
                 }
-
             }
 
             Spacer(Modifier.width(GAP_M))
 
-            /* ---------------- Schichten‑Liste ---------------- */
+            /* Schichtenliste */
             Column(Modifier.weight(2f)) {
                 selectedAuftrag?.let {
                     GrayIconButton(Icons.Default.Add, "Schicht", "Neue Schicht", false, onClick = {
-                        selectedSchicht = null; showSchichtForm = true
+                        selectedSchichtId = null
+                        showSchichtForm = true
                     })
                     Spacer(Modifier.height(GAP_S))
                 }
                 Text("Schichtenliste", style = MaterialTheme.typography.h6)
                 Spacer(Modifier.height(GAP_XS))
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(GAP_S)) {
-                    itemsIndexed(selectedAuftrag?.schichten.orEmpty()) { i, s ->
-                        GrayFillButton(
-                            icon = Icons.Default.DateRange,
-                            label = "Schicht ${i + 1}: ${s.startDatum?.format(dateTimeFmt).orEmpty()}",
-                            tooltip = "Schicht ${i + 1}",
-                            selected = s == selectedSchicht,
-                            onClick = { selectedSchicht = s }
-                        )
+                    selectedAuftrag?.schichten.orEmpty().also { list ->
+                        items(
+                            items = list,
+                            key = { it.id }
+                        ) { s ->
+                            val isSel = s.id == selectedSchichtId
+                            GrayFillButton(
+                                icon = Icons.Default.DateRange,
+                                label = "Schicht ${list.indexOf(s) + 1}: ${s.startDatum?.format(dateTimeFmt).orEmpty()}",
+                                tooltip = "Schicht ${list.indexOf(s) + 1}",
+                                selected = isSel,
+                                onClick = { selectedSchichtId = s.id }
+                            )
+                        }
                     }
                 }
             }
 
             Spacer(Modifier.width(GAP_M))
 
-            /* ---------------- Detail‑Ansicht ---------------- */
+            /* Detailansicht */
             Column(Modifier.weight(5f)) {
                 Text("Details", style = MaterialTheme.typography.h6)
                 Spacer(Modifier.height(GAP_S))
+
                 selectedSchicht?.let { s ->
-                    listOf(
-                        "Start"     to s.startDatum?.format(dateTimeFmt).orEmpty(),
-                        "Ende"      to s.endDatum?.format(dateTimeFmt).orEmpty(),
-                        "Ort"       to s.ort.orEmpty(),
-                        "Strecke"   to s.strecke.orEmpty(),
-                        "Km"        to "${s.kmVon.orEmpty()} – ${s.kmBis.orEmpty()}",
-                        "Maßnahme"  to s.massnahme.orEmpty(),
-                        "Bemerkung" to s.bemerkung.orEmpty()
-                    ).forEach { (k,v) -> Text("$k: $v") }
-                    Spacer(Modifier.height(GAP_S))
-                    GrayIconButton(Icons.Default.Edit, "Bearbeiten", "Schicht bearbeiten", false, onClick = {
-                        showSchichtForm = true
-                    })
+                    /** kleine Helper zum hübschen Formatieren */
+                    fun List<Any?>?.toLabelList(label: (Any) -> String): String =
+                        this?.takeIf { it.isNotEmpty() }
+                            ?.joinToString("\n") { "•${label(it as Any)}" }
+                    ?: "—"
+
+                    val personenTxt = s.mitarbeiter.toLabelList {
+                        it as Person; "${it.vorname} ${it.name}".trim()
+                    }
+                    val fahrzeugeTxt = s.fahrzeug.toLabelList {
+                        it as Fahrzeug; it.bezeichnung ?: "—"
+                    }
+                    val materialTxt = s.material.toLabelList {
+                        it as Material; it.bezeichnung ?: "—"
+                    }
+
+                    // Details in einer LazyColumn
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(GAP_S)
+                    ) {
+                        items(listOf(
+                            "Start"       to s.startDatum?.format(dateTimeFmt).orEmpty(),
+                            "Ende"        to s.endDatum?.format(dateTimeFmt).orEmpty(),
+                            "Ort"         to s.ort.orEmpty(),
+                            "Strecke"     to s.strecke.orEmpty(),
+                            "Km"          to "${s.kmVon.orEmpty()} – ${s.kmBis.orEmpty()}",
+                            "Maßnahme"    to s.massnahme.orEmpty(),
+                            "Mitarbeiter" to personenTxt,
+                            "Fahrzeuge"   to fahrzeugeTxt,
+                            "Material"    to materialTxt,
+                            "Bemerkung"   to s.bemerkung.orEmpty()
+                        )) { (k, v) ->
+                            Text("$k:", style = MaterialTheme.typography.subtitle2)
+                            Text(v,    style = MaterialTheme.typography.body2)
+                        }
+                        // Spacer, damit Edit-Button am Ende bleibt
+                        item {
+                            Spacer(Modifier.weight(1f))
+                        }
+                        item {
+                            GrayIconButton(
+                                Icons.Default.Edit,
+                                "Bearbeiten",
+                                "Schicht bearbeiten",
+                                selected = false,
+                                onClick  = { showSchichtForm = true },
+                                modifier = Modifier
+                                    .align(Alignment.CenterHorizontally)
+                                    .padding(top = GAP_L)
+                            )
+                        }
+                    }
                 } ?: Text("Keine Schicht ausgewählt", color = Color.Gray)
             }
         }
 
-        /* ------------- Fenster: Auftrag & Schicht‑Form ------------- */
-        if (showAuftragForm)
-            Window(
-                onCloseRequest = { showAuftragForm = false },
-                title = if (selectedAuftrag == null) "Neuer Auftrag" else "Auftrag bearbeiten"
-            ) {
+
+        // Form-Fenster für Auftrag
+        if (showAuftragForm) {
+            Window(onCloseRequest = { showAuftragForm = false },
+                title = if (selectedAuftrag == null) "Neuer Auftrag" else "Auftrag bearbeiten",
+                state = windowState) {
                 AuftragForm(
                     initial = selectedAuftrag,
-                    onSave = onSave@ { id, sap, ort, strecke, kmVon, kmBis,
-                                       massnahme, bemerkung, lieferDatum,
-                                       modus, rsDate, rsTime, reDate, reTime,
-                                       anzahl, dauer ->
+                    onSave = onSave@{ id, sap, ort, strecke, kmVon, kmBis,
+                                      massnahme, bemerkung, lieferDatum,
+                                      modus, rsDate, rsTime, reDate, reTime,
+                                      anzahl, dauer ->
+
+                        // wenn irgendwas ungültig ist, früh abbrechen:
+                        if (modus != WiederholungsModus.KEINE && rsDate.isBlank()) {
+                            // return in die lambda, nicht in die umgebende Funktion
+                            return@onSave
+                        }
 
                         val basis = Auftrag(
                             id         = id ?: UUID.randomUUID().toString(),
                             sapANummer = sap,
-                            startDatum = null,
+                            startDatum = lieferDatum?.toLocalDateTimeOrNull(),
                             endDatum   = null,
                             ort        = ort,
                             strecke    = strecke,
                             kmVon      = kmVon,
                             kmBis      = kmBis,
                             massnahme  = massnahme,
-                            bemerkung  = bemerkung
-                                .let {
-                                    if (lieferDatum.isNullOrBlank()) it
-                                    else if (it.isBlank()) "Lieferdatum: $lieferDatum"
-                                    else "$it\nLieferdatum: $lieferDatum"
-                                },
+                            bemerkung  = bemerkung,
                             schichten  = emptyList()
                         )
 
-                        val startDT = if (modus == WiederholungsModus.KEINE)
-                            null            // nicht nötig
-                        else
-                            "$rsDate $rsTime".toLocalDateTimeOrNull() ?: return@onSave
-
+                        val startDT = if (modus == WiederholungsModus.KEINE) null
+                        else "$rsDate $rsTime".toLocalDateTimeOrNull() ?: return@onSave
                         val endDT   = if (reDate.isNotBlank() && reTime.isNotBlank())
                             "$reDate $reTime".toLocalDateTimeOrNull()
                         else null
                         val dauerStd = dauer ?: 8L
 
                         if (modus == WiederholungsModus.KEINE) {
-                            // ───────────── einzelner/freier Auftrag ─────────────
-                            if (selectedAuftrag == null) {
-                                viewModel.addAuftrag(basis)                       // neu anlegen
-                            } else {
-                                viewModel.updateAuftrag(basis.copy(id = selectedAuftrag!!.id)) // nur Felder updaten
-                            }
-
+                            if (selectedAuftrag == null) viewModel.addAuftrag(basis)
+                            else                      viewModel.updateAuftrag(basis.copy(id = selectedAuftrag.id))
                         } else {
-                            // ───────────── Auftrag mit automatischen Schichten ─────────────
-                            if (modus == WiederholungsModus.KEINE) {
-                                // Auftrag ohne automatische Schichten
-                                if (selectedAuftrag == null)
-                                    viewModel.addAuftrag(basis)
-                                else
-                                    viewModel.updateAuftrag(basis.copy(id = selectedAuftrag!!.id))
-                            } else {
-                                // automatische Schichten – startDT darf jetzt null sein
-                                viewModel.addAuftragAutomatisch(
-                                    basis  = basis,
-                                    modus  = modus,
-                                    start  = startDT,      // nullable passt zur neuen Signatur
-                                    ende   = endDT,
-                                    anzahl = anzahl,
-                                    dauer  = dauerStd
-                                )
-                            }
+                            viewModel.addAuftragAutomatisch(
+                                basis  = basis,
+                                modus  = modus,
+                                start  = startDT,
+                                ende   = endDT,
+                                anzahl = anzahl,
+                                dauer  = dauerStd
+                            )
                         }
 
+                        // Dialog schließen und Selektion setzen
+                        showAuftragForm     = false
+                        selectedAuftragId   = basis.id
 
-                            showAuftragForm = false
+                    }, // Ende onSave-Lambda
+                    onDelete = selectedAuftrag?.let {
+                        {
+                            viewModel.deleteAuftrag(it.id)
+                            showAuftragForm    = false
+                            selectedAuftragId  = null
+                        }
                     },
-                    onDelete = selectedAuftrag?.let { { viewModel.deleteAuftrag(it.id) } },
                     onCancel = { showAuftragForm = false }
                 )
+
+
             }
+        }
 
-
-        if (showSchichtForm && selectedAuftrag!=null)
-            Window(onCloseRequest={showSchichtForm=false},
-                title = if (selectedSchicht==null)"Neue Schicht" else "Schicht bearbeiten") {
+        // Form-Fenster für Schicht
+        if (showSchichtForm && selectedAuftrag != null) {
+            Window(onCloseRequest = { showSchichtForm = false },
+                title = if (selectedSchicht == null) "Neue Schicht" else "Schicht bearbeiten",
+                state = windowState
+            ) {
                 SchichtForm(
-                    initial = selectedSchicht,
-                    formatter = dateTimeFmt,
-                    dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy"),
-                    onSave = { /* … */ },
-                    onCancel = { showSchichtForm=false }
+                    initial  = selectedSchicht,
+                    onSave   = { neueSchicht ->
+                        if (selectedSchicht == null) viewModel.addSchicht(selectedAuftrag.id, neueSchicht)
+                        else                          viewModel.updateSchicht(neueSchicht.id, neueSchicht)
+                        showSchichtForm   = false
+                        selectedSchichtId = neueSchicht.id
+                    },
+                    onDelete = selectedSchicht?.let { schicht ->
+                        {
+                            // 1. Schicht aus DB löschen
+                            viewModel.deleteSchicht(selectedAuftrag.id, schicht.id)
+                            // 2. Formular schließen und Selektion zurücksetzen
+                            showSchichtForm   = false
+                            selectedSchichtId = null
+                        }
+                    },
+                    onCancel = { showSchichtForm = false },
+                    vm       = viewModel
                 )
             }
+        }
     }
+
 
 
     // Hinweis: AuftragForm und SchichtForm weiterhin unverändert (Anpassung sofern nötig).
@@ -459,6 +540,9 @@
         var anzahlVal by remember { mutableStateOf(TextFieldValue("")) }
         var dauerVal  by remember { mutableStateOf(TextFieldValue("8")) }
 
+        val lieferDT: LocalDateTime? =
+            lieferDateVal.text.trim().toLocalDateTimeOrNull()   // nutzt deinen Helper
+
         /* ---------- Validation ---------- */
         fun String.toLocalDateTimeOrNull(): LocalDateTime? {
             val trimmed = trim()
@@ -511,7 +595,7 @@
             Spacer(Modifier.height(8.dp))
             Text("Wiederholungsmodus", style=MaterialTheme.typography.subtitle1)
             Row(verticalAlignment=Alignment.CenterVertically, horizontalArrangement=Arrangement.spacedBy(16.dp)) {
-                WiederholungsModus.values().forEach { m ->
+                WiederholungsModus.entries.forEach { m ->
                     Row(verticalAlignment=Alignment.CenterVertically) {
                         RadioButton(selected=modus==m,onClick={modus=m})
                         Text(m.name.lowercase().replaceFirstChar{it.uppercase()})
@@ -566,78 +650,207 @@
             }
         }
     }
-    /* ================================================================== */
-    /*  Schicht‑Form                                                      */
-    /* ================================================================== */
+    /* ==================================================================
+    *  view/SchichtForm.kt          (ersetzt alte Fassung)
+    * ================================================================== */
+
     @Composable
     fun SchichtForm(
         initial: Schicht?,
-        formatter: DateTimeFormatter,
-        dateFormatter: DateTimeFormatter,
-        onSave: (Schicht) -> Unit,
-        onCancel: () -> Unit
+        dateFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy"),
+        timeFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("HH:mm"),
+        onSave:  (Schicht) -> Unit,
+        onDelete: (() -> Unit)? = null,
+        onCancel: () -> Unit,
+        vm:      AuftraegeViewModel = remember { AuftraegeViewModel() }
     ) {
-        /* -------- States -------- */
-        var startVal by remember { mutableStateOf(TextFieldValue(initial?.startDatum?.format(formatter).orEmpty())) }
-        var endVal   by remember { mutableStateOf(TextFieldValue(initial?.endDatum?.format(formatter).orEmpty())) }
-        var ortVal   by remember { mutableStateOf(TextFieldValue(initial?.ort.orEmpty())) }
-        var streckeVal by remember { mutableStateOf(TextFieldValue(initial?.strecke.orEmpty())) }
-        var kmVonVal  by remember { mutableStateOf(TextFieldValue(initial?.kmVon.orEmpty())) }
-        var kmBisVal  by remember { mutableStateOf(TextFieldValue(initial?.kmBis.orEmpty())) }
+        /* ----------- STATE ------------------------------------------------ */
+        var startDate by remember { mutableStateOf(TextFieldValue(initial?.startDatum?.format(dateFmt).orEmpty())) }
+        var startTime by remember { mutableStateOf(TextFieldValue(initial?.startDatum?.format(timeFmt).orEmpty())) }
+        var endDate   by remember { mutableStateOf(TextFieldValue(initial?.endDatum?.format(dateFmt).orEmpty())) }
+        var endTime   by remember { mutableStateOf(TextFieldValue(initial?.endDatum?.format(timeFmt).orEmpty())) }
+
+        var ortVal       by remember { mutableStateOf(TextFieldValue(initial?.ort.orEmpty())) }
+        var streckeVal   by remember { mutableStateOf(TextFieldValue(initial?.strecke.orEmpty())) }
+        var kmVonVal     by remember { mutableStateOf(TextFieldValue(initial?.kmVon.orEmpty())) }
+        var kmBisVal     by remember { mutableStateOf(TextFieldValue(initial?.kmBis.orEmpty())) }
         var massnahmeVal by remember { mutableStateOf(TextFieldValue(initial?.massnahme.orEmpty())) }
         var bemerkungVal by remember { mutableStateOf(TextFieldValue(initial?.bemerkung.orEmpty())) }
+        var pauseVal     by remember { mutableStateOf(TextFieldValue(initial?.pausenZeit?.toString() ?: "0")) }
 
-        /* -------- Validierung -------- */
-        val parsedStart = startVal.text.toLocalDateTimeOrNull()
-        val parsedEnd   = endVal.text.toLocalDateTimeOrNull()
-        val startErr    = startVal.text.isNotBlank() && parsedStart == null
-        val endErr      = endVal.text.isNotBlank()   && parsedEnd   == null
+        /* aktuell gewählte Relationen */
+        var personsSel   by remember { mutableStateOf(initial?.mitarbeiter?.toSet() ?: emptySet()) }
+        var materialSel  by remember { mutableStateOf(initial?.material?.toSet() ?: emptySet()) }
+        var fahrzeugeSel by remember { mutableStateOf(initial?.fahrzeug?.toSet() ?: emptySet()) }
 
+        /* Picker‑Dialoge sichtbar? */
+        var showPersonDlg   by remember { mutableStateOf(false) }
+        var showMaterialDlg by remember { mutableStateOf(false) }
+        var showFahrzeugDlg by remember { mutableStateOf(false) }
+
+        /* Validierung */
+        fun parse(dt: TextFieldValue, tt: TextFieldValue): LocalDateTime? =
+            "${dt.text.trim()} ${tt.text.trim()}".toLocalDateTimeOrNull()
+
+        val startDT = parse(startDate, startTime)
+        val endDT   = parse(endDate, endTime)
+        val startErr = startDate.text.isNotBlank() && startDT == null
+        val endErr   = endDate.text.isNotBlank()   && endDT == null
+        val pauseErr = pauseVal.text.toIntOrNull() == null
+        val pauseMin = pauseVal.text.toIntOrNull() ?: 0
+
+        /* UI */
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Text(if (initial == null) "Neue Schicht hinzufügen" else "Schicht bearbeiten",
                 style = MaterialTheme.typography.h6)
-            Spacer(Modifier.height(8.dp))
-
-            LabeledField("Startdatum", startVal, { startVal = it }, startErr)
-            LabeledField("Enddatum",   endVal,   { endVal   = it }, endErr)
-            LabeledField("Ort",        ortVal,   { ortVal   = it })
-            LabeledField("Strecke",    streckeVal, { streckeVal = it })
-            LabeledField("Km von",     kmVonVal,  { kmVonVal  = it })
-            LabeledField("Km bis",     kmBisVal,  { kmBisVal  = it })
-            LabeledField("Maßnahme",   massnahmeVal, { massnahmeVal = it })
-            LabeledField("Bemerkung",  bemerkungVal, { bemerkungVal = it }, singleLine = false)
-
-            if (startErr) Text("Ungültiges Datum/Zeitformat", color = Color.Red,
-                style = MaterialTheme.typography.caption)
-            if (endErr)   Text("Ungültiges Datum/Zeitformat", color = Color.Red,
-                style = MaterialTheme.typography.caption)
-
             Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), Arrangement.spacedBy(12.dp)) {
-                Button(onClick = onCancel) { Text("Abbrechen") }
-                Button(
-                    enabled = !startErr && !endErr,
-                    onClick = {
-                        val sch = Schicht(
-                            id         = initial?.id ?: UUID.randomUUID().toString(),
-                            startDatum = parsedStart,
-                            endDatum   = parsedEnd,
-                            ort        = ortVal.text,
-                            strecke    = streckeVal.text,
-                            kmVon      = kmVonVal.text,
-                            kmBis      = kmBisVal.text,
-                            massnahme  = massnahmeVal.text,
-                            mitarbeiter= null,
-                            fahrzeug   = null,
-                            material   = null,
-                            bemerkung  = bemerkungVal.text.takeIf { it.isNotBlank() }
-                        )
-                        onSave(sch)
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                // 1. Spalte: Schicht-Details
+                Column(
+                    Modifier.weight(3f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // z.B. CompactDualRow für Start/End + Pause
+                    CompactDualRow(
+                        field1 = { CompactField("Start-Datum", startDate.text, { startDate = it.toTextFieldValue() }, isError = startErr) },
+                        field2 = { CompactField("Start-Zeit", startTime.text, { startTime = it.toTextFieldValue() }, isError = startErr) }
+                    )
+                    CompactDualRow(
+                        field1 = { CompactField("End-Datum", endDate.text, { endDate = it.toTextFieldValue() }, isError = endErr) },
+                        field2 = { CompactField("End-Zeit", endTime.text, { endTime = it.toTextFieldValue() }, isError = endErr) }
+                    )
+                    LabeledField("Pausenzeit [Min]", pauseVal, { pauseVal = it }, isError = pauseErr)
+                    LabeledField("Ort", ortVal, { ortVal = it })
+                    LabeledField("Strecke", streckeVal, { streckeVal = it })
+                    CompactDualRow(
+                        field1 = { CompactField("Km von", kmVonVal.text, { kmVonVal = it.toTextFieldValue() }) },
+                        field2 = { CompactField("Km bis", kmBisVal.text, { kmBisVal = it.toTextFieldValue() }) }
+                    )
+                    LabeledField("Maßnahme", massnahmeVal, { massnahmeVal = it })
+                    LabeledField("Bemerkung", bemerkungVal, { bemerkungVal = it }, singleLine = false)
+                    if (startErr || endErr) {
+                        Text("Bitte gültiges Datum/Uhrzeit eingeben!", color = Color.Red, style = MaterialTheme.typography.caption)
                     }
-                ) { Text("Speichern") }
+                }
+
+                // 2. Spalte: LazyColumns für Auswahl-Listen
+                Column(
+                    Modifier.weight(2f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Mitarbeiter:", style = MaterialTheme.typography.subtitle2)
+                    LazyColumn(Modifier.height(100.dp)) {
+                        items(personsSel.toList()) { p -> Text("• ${p.vorname} ${p.name}") }
+                    }
+                    Text("Material:", style = MaterialTheme.typography.subtitle2)
+                    LazyColumn(Modifier.height(100.dp)) {
+                        items(materialSel.toList()) { m -> Text("• ${m.bezeichnung}") }
+                    }
+                    Text("Fahrzeuge:", style = MaterialTheme.typography.subtitle2)
+                    LazyColumn(Modifier.height(100.dp)) {
+                        items(fahrzeugeSel.toList()) { f -> Text("• ${f.bezeichnung}") }
+                    }
+                }
+
+                // 3. Spalte: Buttons zum Hinzufügen
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .align(Alignment.Top),  // Buttons oben ausrichten
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    GrayIconButton(
+                        Icons.Default.Person, "Mitarbeiter auswählen", "Dialog öffnen", false
+                    , { showPersonDlg = true })
+                    GrayIconButton(
+                        Icons.Default.Build, "Material auswählen", "Dialog öffnen", false
+                    , { showMaterialDlg = true })
+                    GrayIconButton(
+                        Icons.Default.Settings, "Fahrzeuge auswählen", "Dialog öffnen", false
+                    , { showFahrzeugDlg = true })
+                }
             }
+
+            Spacer(Modifier.height(16.dp))
+
+            // Aktionen am unteren Rand
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(onClick = onCancel) {
+                    Icon(Icons.Default.Close, ""); Spacer(Modifier.width(4.dp)); Text("Abbrechen")
+                }
+                initial?.let {
+                    OutlinedButton(
+                        onClick = { onDelete?.invoke() },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red)
+                    ) {
+                        Icon(Icons.Default.Delete, ""); Spacer(Modifier.width(4.dp)); Text("Löschen")
+                    }
+                }
+                Spacer(Modifier.weight(1f))
+                Button(
+                    enabled = !startErr && !endErr && startDT != null,
+                    onClick = {
+                        val sd = startDT ?: return@Button  // wenn null, nichts tun
+                        onSave(
+                            Schicht(
+                                id         = initial?.id ?: UUID.randomUUID().toString(),
+                                startDatum = sd,
+                                endDatum   = endDT,
+                                pausenZeit = pauseMin,
+                                ort        = ortVal.text,
+                                strecke    = streckeVal.text,
+                                kmVon      = kmVonVal.text,
+                                kmBis      = kmBisVal.text,
+                                massnahme  = massnahmeVal.text,
+                                mitarbeiter= personsSel.toList(),
+                                fahrzeug   = fahrzeugeSel.toList(),
+                                material   = materialSel.toList(),
+                                bemerkung  = bemerkungVal.text.takeIf { it.isNotBlank() }
+                            )
+                        )
+                    }
+                ) {
+                    Icon(Icons.Default.Add, ""); Spacer(Modifier.width(4.dp)); Text("Speichern")
+                }
+
+
+            }
+
+            // Picker‑Dialoge
+            if (showPersonDlg) MultiSelectDialog(
+                title   = "Mitarbeiter auswählen",
+                items   = vm.personen,
+                label   = { "${it.vorname} ${it.name}".trim() },
+                preSel  = personsSel,
+                onClose = { it?.let { personsSel = it }; showPersonDlg = false }
+            )
+            if (showMaterialDlg) MultiSelectDialog(
+                title   = "Material auswählen",
+                items   = vm.material,
+                label   = { it.bezeichnung ?: "—" },
+                preSel  = materialSel,
+                onClose = { it?.let { materialSel = it }; showMaterialDlg = false }
+            )
+            if (showFahrzeugDlg) MultiSelectDialog(
+                title   = "Fahrzeuge auswählen",
+                items   = vm.fahrzeuge,
+                label   = { it.bezeichnung ?: "—" },
+                preSel  = fahrzeugeSel,
+                onClose = { it?.let { fahrzeugeSel = it }; showFahrzeugDlg = false }
+            )
         }
     }
+
+
+    /* ------------- kleine Extension --------------------------------------*/
+    private fun String.toTextFieldValue() = TextFieldValue(this)
+    private fun TextFieldValue(text: String) = TextFieldValue(text)
+
 
     /* ================================================================== */
     /*  String → LocalDateTime Helper                                     */
@@ -744,4 +957,58 @@
                 }
             }
         }
+    }
+
+    /** Generischer Mehrfach‑Auswahl‑Dialog */
+    @Composable
+    fun <T> MultiSelectDialog(
+        title:   String,
+        items:   List<T>,
+        label:   (T) -> String,
+        preSel:  Set<T> = emptySet(),
+        onClose: (Set<T>?) -> Unit         // null == Abbrechen
+    ) {
+        var selected by remember { mutableStateOf(preSel.toMutableSet()) }
+
+        AlertDialog(
+            onDismissRequest = { onClose(null) },
+            title  = { Text(title) },
+            text   = {
+                LazyColumn(Modifier.heightIn(max = 400.dp)) {
+                    items(items) { item ->
+                        val checked = selected.contains(item)
+
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    // 🟢 NEUE Collection erzeugen und in den State schreiben
+                                    selected = selected.toMutableSet().apply {
+                                        if (!add(item)) remove(item)
+                                    }
+                                }
+                                .padding(4.dp)
+                        ) {
+                            Checkbox(
+                                checked = checked,
+                                onCheckedChange = { isChecked ->
+                                    selected = selected.toMutableSet().apply {
+                                        if (isChecked) add(item) else remove(item)
+                                    }
+                                }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(label(item))
+                        }
+                    }
+                }
+
+            },
+            confirmButton = {
+                TextButton(onClick = { onClose(selected) }) { Text("Übernehmen") }
+            },
+            dismissButton = {
+                TextButton(onClick = { onClose(null) })     { Text("Abbrechen") }
+            }
+        )
     }

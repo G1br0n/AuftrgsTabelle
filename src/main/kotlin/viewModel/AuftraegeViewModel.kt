@@ -1,5 +1,6 @@
 package viewModel
 
+import androidx.compose.runtime.mutableStateOf
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import models.*
@@ -12,25 +13,50 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
 /**
- * ViewModel für Aufträge + Schichten.
+ * ViewModel für Aufträge+Schichten.
  *
- * **Neu:** Bei allen externen / String‑Datumsangaben wird jetzt versucht,
- * sie in `LocalDateTime` zu konvertieren. Scheitert das Parsing,
- * wird `null` gespeichert – damit entstehen keine Laufzeitfehler mehr.
+ * **Neu:** Bei allen externen/String‑Datumsangaben wird jetzt versucht,
+ * sie in`LocalDateTime` zu konvertieren. Scheitert das Parsing,
+ * wird`null` gespeichert-damit entstehen keine Laufzeitfehler mehr.
  */
 class AuftraegeViewModel(
     private val repository: AuftragRepository = AuftragRepository()
 ) {
 
-    /* ---------------------------------------------------- intern + Flows */
-    private val _auftraegeFlow = MutableStateFlow<List<Auftrag>>(emptyList())
-    val auftraegeFlow: StateFlow<List<Auftrag>> = _auftraegeFlow.asStateFlow()
-
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    init { loadAuftraege() }
 
-    /* ---------------------------------------------------- Basic CRUD */
+    /* ---------------------------------------------------- intern+Flows */
+    private val _auftraegeFlow = MutableStateFlow<List<Auftrag>>(emptyList())
+    val auftraegeFlow: StateFlow<List<Auftrag>> = _auftraegeFlow.asStateFlow()
+    /* ───────────────── Stammdaten ─────────────────── */
+
+    private val _personen  = MutableStateFlow<List<Person>>(emptyList())
+    val    personen get() = _personen.value          // ← List<Person>
+
+    private val _fahrzeuge = MutableStateFlow<List<Fahrzeug>>(emptyList())
+    val    fahrzeuge get() = _fahrzeuge.value        // ← List<Fahrzeug>
+
+    private val _material  = MutableStateFlow<List<Material>>(emptyList())
+    val    material  get() = _material.value         // ← List<Material>
+
+    /* ───────── restlicher Code unverändert ─────────── */
+
+    init {
+        loadAuftraege()
+        loadStammdaten()           // <‑‑ neu aufrufen
+    }
+
+    private fun loadStammdaten() = scope.launch {
+        _personen .value = repository.getAllPerson()
+        _fahrzeuge.value = repository.getAllFahrzeug()
+        _material .value = repository.getAllMaterial()
+    }
+
+
+
+
+    /* ---------------------------------------------------- BasicCRUD */
     fun loadAuftraege() = scope.launch {
         _auftraegeFlow.value = repository.getAllAuftraege()
     }
@@ -50,8 +76,8 @@ class AuftraegeViewModel(
         _auftraegeFlow.update { it.filterNot { o -> o.id == id } }
     }
 
-    /* ---------------------------------------------- Automatisches Anlegen
-       Variante 1 – Aufrufer liefert gültige LocalDateTime‑Objekte.
+    /* ---------------------------------------------- AutomatischesAnlegen
+       Variante1 – Aufrufer liefert gültige LocalDateTime‑Objekte.
      */
     fun addAuftragAutomatisch(
         basis: Auftrag,
@@ -67,8 +93,8 @@ class AuftraegeViewModel(
     }
 
 
-    /* ---------------------------------------------- Automatisches Anlegen
-       Variante 2 – Aufrufer liefert Strings; Parsing wird abgesichert.
+    /* ---------------------------------------------- AutomatischesAnlegen
+       Variante2 – Aufrufer liefert Strings; Parsingwird abgesichert.
      */
     // ViewModel ▸ AuftraegeViewModel.kt
     fun addAuftragAutomatisch(
@@ -79,7 +105,7 @@ class AuftraegeViewModel(
         anzahl: Int?,
         dauer: Long
     ) {
-        // Wird kein Start übergeben →  keine Schichten generieren
+        // Wird kein Start übergeben → keine Schichten generieren
         val schichten = if (start != null)
             generiereSchichten(modus, start, ende, anzahl, dauer, basis.toTemplateSchicht())
         else
@@ -137,7 +163,7 @@ class AuftraegeViewModel(
         anzahl: Int?,
         dauer: Long
     ) {
-        val start = startStr.toLocalDateTimeOrNull() ?: return  // ohne gültigen Start kein Update
+        val start = startStr.toLocalDateTimeOrNull() ?: return  // ohne gültigenStart keinUpdate
         val ende  = endeStr.toLocalDateTimeOrNull()
         updateAuftragAutomatisch(original, basis, modus, start, ende, anzahl, dauer)
     }
@@ -151,10 +177,8 @@ class AuftraegeViewModel(
         kmVon      = kmVon,
         kmBis      = kmBis,
         massnahme  = massnahme,
-        mitarbeiter= null,
-        fahrzeug   = null,
-        material   = null,
-        bemerkung  = bemerkung
+        bemerkung  = bemerkung,
+        pausenZeit = 0
     )
 
     /* ------------------------------------------------ Schichten I/O */

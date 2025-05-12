@@ -21,24 +21,27 @@ data class Auftrag(
     val schichten: List<Schicht>?
 )
 
+// models/Schicht.kt
 data class Schicht(
-    val id: String = UUID.randomUUID().toString(),
+    val id:          String           = UUID.randomUUID().toString(),
+    val startDatum:  LocalDateTime?   = null,
+    val endDatum:    LocalDateTime?   = null,
+    val ort:         String?          = null,
+    val strecke:     String?          = null,
+    val kmVon:       String?          = null,
+    val kmBis:       String?          = null,
+    val massnahme:   String?          = null,
+    val bemerkung:   String?          = null,
 
-    val startDatum: LocalDateTime?,
-    val endDatum: LocalDateTime?,
+    /* ───── neue Zeile: ───── */
+    val pausenZeit:  Int             = 0,          // Minuten
 
-    val ort: String?,
-    val strecke: String?,
-    val kmVon: String?,
-    val kmBis: String?,
-    val massnahme: String?,
-
-    val mitarbeiter: List<Person>?,
-    val fahrzeug: List<Fahrzeug>?,
-    val material: List<Material>?,
-
-    val bemerkung: String?
+    /* Relationen  … */
+    val mitarbeiter: List<Person>    = emptyList(),
+    val fahrzeug:    List<Fahrzeug>  = emptyList(),
+    val material:    List<Material>  = emptyList()
 )
+
 
 data class Person (
     val id: String = UUID.randomUUID().toString(),
