@@ -135,6 +135,7 @@ fun TimePickerField(
     }
 }
 
+@ExperimentalMaterial3Api
 @Composable
 fun DateTimePickerField(
     label: String,
@@ -144,7 +145,21 @@ fun DateTimePickerField(
 ) {
     var date by remember { mutableStateOf(initialDateTime?.toLocalDate()) }
     var time by remember { mutableStateOf(initialDateTime?.toLocalTime()) }
+    var showDateDialog by remember { mutableStateOf(false) }
+    var showTimeDialog by remember { mutableStateOf(false) }
     val formatter = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm") }
+
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = date
+            ?.atStartOfDay(ZoneOffset.UTC)
+            ?.toInstant()
+            ?.toEpochMilli()
+    )
+    val timePickerState = rememberTimePickerState(
+        initialHour = time?.hour ?: LocalTime.now().hour,
+        initialMinute = time?.minute ?: LocalTime.now().minute,
+        is24Hour = true
+    )
 
     OutlinedTextField(
         value = if (date != null && time != null)
@@ -154,19 +169,59 @@ fun DateTimePickerField(
         label = { Text(label) },
         readOnly = true,
         trailingIcon = {
-            Row {
-                IconButton(onClick = { date = null }) {
-                    Icon(Icons.Default.DateRange, contentDescription = null)
-                }
-                IconButton(onClick = { time = null }) {
-                    Icon(Icons.Default.Edit, contentDescription = null)
-                }
+            IconButton(onClick = { showDateDialog = true }) {
+                Icon(Icons.Default.DateRange, contentDescription = "Datum & Zeit wählen")
             }
         },
         modifier = modifier
             .fillMaxWidth()
             .height(56.dp)
     )
+
+    if (showDateDialog) {
+        DatePickerDialog(
+            onDismissRequest = { showDateDialog = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        date = Instant.ofEpochMilli(millis)
+                            .atZone(ZoneOffset.UTC)
+                            .toLocalDate()
+                    }
+                    showDateDialog = false
+                    showTimeDialog = true
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDateDialog = false }) { Text("Abbrechen") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showTimeDialog) {
+        AlertDialog(
+            onDismissRequest = { showTimeDialog = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    time = LocalTime.of(timePickerState.hour, timePickerState.minute)
+                    showTimeDialog = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimeDialog = false }) { Text("Abbrechen") }
+            },
+            text = {
+                TimePicker(
+                    state = timePickerState,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = TimePickerDefaults.colors(),
+                    layoutType = TimePickerLayoutType.Vertical
+                )
+            }
+        )
+    }
 
     LaunchedEffect(date, time) {
         if (date != null && time != null) {
