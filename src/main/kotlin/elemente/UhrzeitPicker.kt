@@ -1,9 +1,7 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package elemente
 
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Edit
@@ -22,11 +20,19 @@ fun DatePickerField(
     onDateSelected: (LocalDate) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Verwende UTC, um Zeitzonen-Verschiebungen zu vermeiden
+    // Fallback: heute um Mitternacht UTC
+    val todayMillis = LocalDate
+        .now()
+        .atStartOfDay(ZoneOffset.UTC)
+        .toInstant()
+        .toEpochMilli()
+
     val initialMillis = selectedDate
         ?.atStartOfDay(ZoneOffset.UTC)
         ?.toInstant()
         ?.toEpochMilli()
+        ?: todayMillis
+
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = initialMillis
     )
@@ -54,7 +60,6 @@ fun DatePickerField(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        // Rückkonvertierung in UTC
                         val ld = Instant.ofEpochMilli(millis)
                             .atZone(ZoneOffset.UTC)
                             .toLocalDate()
@@ -82,11 +87,13 @@ fun TimePickerField(
     colors: TimePickerColors = TimePickerDefaults.colors(),
     layoutType: TimePickerLayoutType = TimePickerLayoutType.Vertical
 ) {
-    val current = selectedTime ?: LocalTime.now()
+    // Fallback: 12:00
+    val defaultTime = selectedTime ?: LocalTime.NOON
+
     val timePickerState = rememberTimePickerState(
-        initialHour = current.hour,
-        initialMinute = current.minute,
-        is24Hour = true
+        initialHour   = defaultTime.hour,
+        initialMinute = defaultTime.minute,
+        is24Hour      = true
     )
     var showDialog by remember { mutableStateOf(false) }
     val formatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
@@ -143,28 +150,27 @@ fun DateTimePickerField(
     onDateTimeSelected: (LocalDateTime) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var date by remember { mutableStateOf(initialDateTime?.toLocalDate()) }
-    var time by remember { mutableStateOf(initialDateTime?.toLocalTime()) }
+    // Default: heute / 12:00
+    var date by remember { mutableStateOf(initialDateTime?.toLocalDate() ?: LocalDate.now()) }
+    var time by remember { mutableStateOf(initialDateTime?.toLocalTime() ?: LocalTime.NOON) }
     var showDateDialog by remember { mutableStateOf(false) }
     var showTimeDialog by remember { mutableStateOf(false) }
     val formatter = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm") }
 
     val datePickerState = rememberDatePickerState(
         initialSelectedDateMillis = date
-            ?.atStartOfDay(ZoneOffset.UTC)
-            ?.toInstant()
-            ?.toEpochMilli()
+            .atStartOfDay(ZoneOffset.UTC)
+            .toInstant()
+            .toEpochMilli()
     )
     val timePickerState = rememberTimePickerState(
-        initialHour = time?.hour ?: LocalTime.now().hour,
-        initialMinute = time?.minute ?: LocalTime.now().minute,
-        is24Hour = true
+        initialHour   = time.hour,
+        initialMinute = time.minute,
+        is24Hour      = true
     )
 
     OutlinedTextField(
-        value = if (date != null && time != null)
-            LocalDateTime.of(date, time).format(formatter)
-        else "",
+        value = LocalDateTime.of(date, time).format(formatter),
         onValueChange = {},
         label = { Text(label) },
         readOnly = true,
@@ -224,8 +230,6 @@ fun DateTimePickerField(
     }
 
     LaunchedEffect(date, time) {
-        if (date != null && time != null) {
-            onDateTimeSelected(LocalDateTime.of(date, time))
-        }
+        onDateTimeSelected(LocalDateTime.of(date, time))
     }
 }

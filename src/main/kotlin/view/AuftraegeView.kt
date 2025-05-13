@@ -503,7 +503,7 @@
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 RadioButton(selected = modus == m, onClick = { modus = m })
                                 Spacer(Modifier.width(4.dp))
-                                Text(m.name.lowercase().replaceFirstChar { it.uppercase() })
+                                Text(m.label.lowercase().replaceFirstChar { it.uppercase() })
                             }
                         }
                     }
@@ -1055,64 +1055,55 @@
         preSel: Set<T> = emptySet(),
         onResult: (Set<T>?) -> Unit
     ) {
-        var selected by remember { mutableStateOf(preSel.toMutableSet()) }
+        // State hält jetzt ein unveränderliches Set
+        var selected by remember { mutableStateOf(preSel) }
+        val windowState = rememberWindowState(size = DpSize(600.dp, 600.dp))
 
-        // Modal-Dialog statt Window
-        Dialog(
+        Window(
             onCloseRequest = { onResult(null) },
             title = title,
-            state = rememberDialogState(width = 600.dp, height = 600.dp)
+            state = windowState,
+            alwaysOnTop = true
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(8.dp)
-            ) {
+            Column(Modifier.fillMaxSize().padding(8.dp)) {
                 Text("$title (${selected.size} ausgewählt)", style = MaterialTheme.typography.h6)
                 Spacer(Modifier.height(8.dp))
 
-                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    LazyColumn {
-                        items(items) { item ->
-                            val isChecked = selected.contains(item)
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        if (isChecked) selected.remove(item)
-                                        else selected.add(item)
-                                    }
-                                    .padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Checkbox(
-                                    checked = isChecked,
-                                    onCheckedChange = { checked ->
-                                        if (checked) selected.add(item)
-                                        else selected.remove(item)
-                                    }
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(label(item))
-                            }
+                LazyColumn(Modifier.weight(1f)) {
+                    items(items) { item ->
+                        val isChecked = selected.contains(item)
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    // Hier wird nun die State-Variable neu gesetzt,
+                                    // Compose sieht eine andere Referenz und recomposed
+                                    selected = if (isChecked) selected - item
+                                    else selected + item
+                                }
+                                .padding(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = isChecked,
+                                onCheckedChange = { checked ->
+                                    // Genauso hier: neue Menge zuweisen
+                                    selected = if (checked) selected + item
+                                    else selected - item
+                                }
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(label(item))
                         }
                     }
                 }
 
                 Divider()
                 Spacer(Modifier.height(8.dp))
-
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    OutlinedButton(onClick = { onResult(null) }) {
-                        Text("Abbrechen")
-                    }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    OutlinedButton(onClick = { onResult(null) }) { Text("Abbrechen") }
                     Spacer(Modifier.width(8.dp))
-                    Button(onClick = { onResult(selected) }) {
-                        Text("Übernehmen")
-                    }
+                    Button(onClick = { onResult(selected) })   { Text("Übernehmen") }
                 }
             }
         }
