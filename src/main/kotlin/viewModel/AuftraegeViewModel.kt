@@ -28,7 +28,24 @@ class AuftraegeViewModel(
 
     /* ---------------------------------------------------- intern+Flows */
     private val _auftraegeFlow = MutableStateFlow<List<Auftrag>>(emptyList())
-    val auftraegeFlow: StateFlow<List<Auftrag>> = _auftraegeFlow.asStateFlow()
+    val auftraegeFlow: StateFlow<List<Auftrag>> = _auftraegeFlow
+        .map { list ->
+            // 1) Aufträge ohne startDatum, in umgekehrter Einfügungsreihenfolge
+            val ohneStart = list
+                .filter { it.startDatum == null }
+                .asReversed()
+            // 2) Aufträge mit startDatum, absteigend nach startDatum
+            val mitStart = list
+                .filter { it.startDatum != null }
+                .sortedByDescending { it.startDatum }
+            ohneStart + mitStart
+        }
+        .stateIn(
+            scope = scope,
+            started = SharingStarted.Eagerly,
+            initialValue = emptyList()
+        )
+
     /* ───────────────── Stammdaten ─────────────────── */
 
     private val _personen  = MutableStateFlow<List<Person>>(emptyList())

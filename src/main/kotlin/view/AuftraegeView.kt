@@ -60,7 +60,7 @@
         // Auswahl nur über IDs
         var selectedAuftragId by remember { mutableStateOf<String?>(null) }
         var selectedSchichtId by remember { mutableStateOf<String?>(null) }
-
+        var filterText by remember { mutableStateOf("") }
         // Dynamisch aktuelles Objekt ermitteln
         val selectedAuftrag = selectedAuftragId?.let { id ->
             auftraege.find { it.id == id }
@@ -80,17 +80,48 @@
                 .padding(GAP_M)
         ) {
             /* Auftragsliste */
-            Column(Modifier.weight(2f)) {
-                GrayIconButton(Icons.Default.Add, "Auftrag", "Neuen Auftrag", false, onClick = {
-                    selectedAuftragId = null
-                    showAuftragForm = true
-                })
+            Column(Modifier.weight(3f)) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    GrayIconButton(
+                        icon     = Icons.Default.Add,
+                        label    = "Auftrag",
+                        tooltip  = "Neuen Auftrag anlegen",
+                        selected = false,
+                        onClick  = {
+                            selectedAuftragId = null
+                            showAuftragForm   = true
+                        }
+                    )
+
+                    Spacer(Modifier.width(4.dp))
+                    OutlinedTextField(
+                        value = filterText,
+                        onValueChange = { filterText = it },
+                        label = { Text("Filter S/A-Nr.") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Spacer(Modifier.height(8.dp))
+
+                /* gefilterte und – falls gefiltert – nach sapANummer sortierte Liste */
+                val displayed = if (filterText.isNotBlank()) {
+                    auftraege
+                        .filter { it.sapANummer?.contains(filterText, ignoreCase = true) == true }
+                        .sortedBy { it.sapANummer }
+                } else {
+                    auftraege
+                }
                 Spacer(Modifier.height(GAP_S))
                 Text("Auftragsliste", style = MaterialTheme.typography.h6)
                 Spacer(Modifier.height(GAP_XS))
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(GAP_S)) {
                     items(
-                        items = auftraege,
+                        items = displayed,          // statt: items = auftraege
                         key = { it.id }
                     ) { a ->
                         val isSelected = a.id == selectedAuftragId
