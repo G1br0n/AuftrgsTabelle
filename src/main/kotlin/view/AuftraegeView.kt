@@ -943,7 +943,7 @@
                     Text(
                         "${index}. S/A‑Nr.: ${auftrag.sapANummer.orEmpty()}",
                         style = MaterialTheme.typography.subtitle1,
-                        color = txtColor
+                        color = Color.Yellow
                     )
 
                     /* 𝗡𝗘𝗨: immer sichtbares Lieferdatum */
