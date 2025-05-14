@@ -26,6 +26,24 @@ class MitarbeiterViewModel(
     // Eigenständiger CoroutineScope für Hintergrund-Operationen
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+
+
+    // …
+
+    fun movePerson(from: Int, to: Int) {
+        _personenFlow.update { list ->
+            val mutable = list.toMutableList()
+            val item = mutable.removeAt(from)
+            mutable.add(to, item)
+            // in DB alle Positionen neu schreiben:
+            mutable.forEachIndexed { idx, p ->
+                repository.updatePersonPosition(p.id, idx)
+            }
+            mutable
+        }
+    }
+
+
     init {
         loadPersonen()
     }

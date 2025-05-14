@@ -1,159 +1,196 @@
-    package repository
+package repository
 
+import models.*
+import java.sql.Connection
+import java.sql.DriverManager
+import java.time.LocalDateTime
 
-    import models.*
-    import java.sql.Connection
-    import java.sql.DriverManager
-    import java.time.LocalDateTime
+class AuftragRepository(
+    private val dbPath: String = "jdbc:sqlite:auftrag.db"
+) {
 
-    class AuftragRepository(
-        private val dbPath: String = "jdbc:sqlite:auftrag.db"
-    ) {
+    /* ────────────── DB‑Initialisierung mit Schema-Versionierung ────────────── */
 
-        /* ────────────── DB‑Initialisierung ────────────── */
+    init { createTables() }
 
-        init { createTables() }
+    private fun getConnection(): Connection = DriverManager.getConnection(dbPath)
 
-        private fun getConnection(): Connection = DriverManager.getConnection(dbPath)
+    private fun createTables() {
+        getConnection().use { conn ->
+            conn.createStatement().use { st ->
+                // 1) Aktuelle Datenbank-Version lesen (PRAGMA user_version)
+                val rsVersion = st.executeQuery("PRAGMA user_version;")
+                val version = if (rsVersion.next()) rsVersion.getInt(1) else 0
 
-        private fun createTables() {
-            getConnection().use { c -> c.createStatement().use { st ->
+                // Migration auf Version 1: Basisschema
+                if (version < 1) {
+                    st.execute("""
+                        CREATE TABLE IF NOT EXISTS auftrag(
+                            id TEXT PRIMARY KEY,
+                            sapANummer TEXT,
+                            startDatum TEXT,
+                            endDatum   TEXT,
+                            ort TEXT, strecke TEXT, kmVon TEXT, kmBis TEXT,
+                            massnahme TEXT, bemerkung TEXT
+                        );
+                    """.trimIndent())
 
-                st.execute("""
-                    CREATE TABLE IF NOT EXISTS auftrag(
-                        id TEXT PRIMARY KEY,
-                        sapANummer TEXT,
-                        startDatum TEXT,
-                        endDatum   TEXT,
-                        ort TEXT, strecke TEXT, kmVon TEXT, kmBis TEXT,
-                        massnahme TEXT, bemerkung TEXT
-                    );
-                """)
+                    st.execute("""
+                        CREATE TABLE IF NOT EXISTS schicht(
+                            id TEXT PRIMARY KEY,
+                            auftrag_id TEXT,
+                            startDatum TEXT,
+                            endDatum   TEXT,
+                            ort TEXT, strecke TEXT, kmVon TEXT, kmBis TEXT,
+                            massnahme TEXT,
+                            bemerkung TEXT,
+                            pausenZeit INTEGER DEFAULT 0,
+                            FOREIGN KEY(auftrag_id) REFERENCES auftrag(id)
+                        );
+                    """.trimIndent())
 
+                    st.execute("""
+                        CREATE TABLE IF NOT EXISTS person(
+                            id TEXT PRIMARY KEY,
+                            vorname TEXT, name TEXT, firma TEXT, bemerkung TEXT
+                        );
+                    """.trimIndent())
 
-                st.execute("""
-                    CREATE TABLE IF NOT EXISTS schicht(
-                        id TEXT PRIMARY KEY,
-                        auftrag_id TEXT,
-                        startDatum TEXT,
-                        endDatum   TEXT,
-                        ort TEXT, strecke TEXT, kmVon TEXT, kmBis TEXT,
-                        massnahme TEXT,
-                        bemerkung TEXT,
-    
-                        /* neu: */
-                        pausenZeit INTEGER DEFAULT 0,
-    
-                        FOREIGN KEY(auftrag_id) REFERENCES auftrag(id)
-                    );
-                """)
+                    st.execute("""
+                        CREATE TABLE IF NOT EXISTS fahrzeug(
+                            id TEXT PRIMARY KEY,
+                            bezeichnung TEXT, kennzeichen TEXT, bemerkung TEXT
+                        );
+                    """.trimIndent())
 
-                st.execute("""
-                    CREATE TABLE IF NOT EXISTS person(
-                        id TEXT PRIMARY KEY,
-                        vorname TEXT, name TEXT, firma TEXT, bemerkung TEXT
-                    );
-                """)
+                    st.execute("""
+                        CREATE TABLE IF NOT EXISTS material(
+                            id TEXT PRIMARY KEY,
+                            bezeichnung TEXT, bemerkung TEXT
+                        );
+                    """.trimIndent())
 
-                st.execute("""
-                    CREATE TABLE IF NOT EXISTS fahrzeug(
-                        id TEXT PRIMARY KEY,
-                        bezeichnung TEXT, kennzeichen TEXT, bemerkung TEXT
-                    );
-                """)
+                    st.execute("""
+                        CREATE TABLE IF NOT EXISTS schicht_person(
+                            schicht_id TEXT, person_id TEXT,
+                            PRIMARY KEY(schicht_id, person_id),
+                            FOREIGN KEY(schicht_id) REFERENCES schicht(id),
+                            FOREIGN KEY(person_id)  REFERENCES person(id)
+                        );
+                    """.trimIndent())
 
-                st.execute("""
-                    CREATE TABLE IF NOT EXISTS material(
-                        id TEXT PRIMARY KEY,
-                        bezeichnung TEXT, bemerkung TEXT
-                    );
-                """)
+                    st.execute("""
+                        CREATE TABLE IF NOT EXISTS schicht_fahrzeug(
+                            schicht_id TEXT, fahrzeug_id TEXT,
+                            PRIMARY KEY(schicht_id, fahrzeug_id),
+                            FOREIGN KEY(schicht_id)  REFERENCES schicht(id),
+                            FOREIGN KEY(fahrzeug_id) REFERENCES fahrzeug(id)
+                        );
+                    """.trimIndent())
 
-                st.execute("""
-                    CREATE TABLE IF NOT EXISTS schicht_person(
-                        schicht_id TEXT, person_id TEXT,
-                        PRIMARY KEY(schicht_id, person_id),
-                        FOREIGN KEY(schicht_id) REFERENCES schicht(id),
-                        FOREIGN KEY(person_id)  REFERENCES person(id)
-                    );
-                """)
+                    st.execute("""
+                        CREATE TABLE IF NOT EXISTS schicht_material(
+                            schicht_id TEXT, material_id TEXT,
+                            PRIMARY KEY(schicht_id, material_id),
+                            FOREIGN KEY(schicht_id)  REFERENCES schicht(id),
+                            FOREIGN KEY(material_id) REFERENCES material(id)
+                        );
+                    """.trimIndent())
 
-                st.execute("""
-                    CREATE TABLE IF NOT EXISTS schicht_fahrzeug(
-                        schicht_id TEXT, fahrzeug_id TEXT,
-                        PRIMARY KEY(schicht_id, fahrzeug_id),
-                        FOREIGN KEY(schicht_id)  REFERENCES schicht(id),
-                        FOREIGN KEY(fahrzeug_id) REFERENCES fahrzeug(id)
-                    );
-                """)
+                    // Version auf 1 setzen
+                    conn.createStatement().execute("PRAGMA user_version = 1;")
+                }
 
-                st.execute("""
-                    CREATE TABLE IF NOT EXISTS schicht_material(
-                        schicht_id TEXT, material_id TEXT,
-                        PRIMARY KEY(schicht_id, material_id),
-                        FOREIGN KEY(schicht_id)  REFERENCES schicht(id),
-                        FOREIGN KEY(material_id) REFERENCES material(id)
-                    );
-                """)
-            }}
+                // Migration auf Version 2: position-Spalte in person
+                if (version < 2) {
+                    st.execute("ALTER TABLE person ADD COLUMN position INTEGER DEFAULT 0;")
+                    st.execute("UPDATE person SET position = rowid;") // initiale Reihenfolge
+                    conn.createStatement().execute("PRAGMA user_version = 2;")
+                }
+
+                // Weitere Migrationen bei version < 3,4... hier hinzufügen
+            }
         }
+    }
 
-
-        // CRUD für Person
-        fun insertPerson(p: Person) {
-            val sql = "INSERT INTO person(id, vorname, name, firma, bemerkung) VALUES(?,?,?,?,?)"
-            getConnection().use { conn ->
-                conn.prepareStatement(sql).use { stmt ->
-                    stmt.setString(1, p.id)
-                    stmt.setString(2, p.vorname)
-                    stmt.setString(3, p.name)
-                    stmt.setString(4, p.firma)
-                    stmt.setString(5, p.bemerkung)
-                    stmt.executeUpdate()
+    /** CRUD für Person inkl. Positions-Persistenz */
+    fun insertPerson(p: Person) {
+        // nächste Position ermitteln
+        val nextPos = getConnection().use { conn ->
+            conn.createStatement().use { st ->
+                st.executeQuery("SELECT COALESCE(MAX(position), -1) + 1 FROM person;").use { rs ->
+                    if (rs.next()) rs.getInt(1) else 0
                 }
             }
         }
+        val sql = "INSERT INTO person(id, vorname, name, firma, bemerkung, position) VALUES(?,?,?,?,?,?)"
+        getConnection().use { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.setString(1, p.id)
+                stmt.setString(2, p.vorname)
+                stmt.setString(3, p.name)
+                stmt.setString(4, p.firma)
+                stmt.setString(5, p.bemerkung)
+                stmt.setInt(6, nextPos)
+                stmt.executeUpdate()
+            }
+        }
+    }
 
-        fun updatePerson(id: String, p: Person) {
-            val sql = "UPDATE person SET vorname=?, name=?, firma=?, bemerkung=? WHERE id=?"
-            getConnection().use { conn ->
-                conn.prepareStatement(sql).use { stmt ->
-                    stmt.setString(1, p.vorname)
-                    stmt.setString(2, p.name)
-                    stmt.setString(3, p.firma)
-                    stmt.setString(4, p.bemerkung)
-                    stmt.setString(5, id)
-                    stmt.executeUpdate()
+    fun updatePerson(id: String, p: Person) {
+        val sql = "UPDATE person SET vorname=?, name=?, firma=?, bemerkung=? WHERE id=?"
+        getConnection().use { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.setString(1, p.vorname)
+                stmt.setString(2, p.name)
+                stmt.setString(3, p.firma)
+                stmt.setString(4, p.bemerkung)
+                stmt.setString(5, id)
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    fun updatePersonPosition(id: String, position: Int) {
+        val sql = "UPDATE person SET position = ? WHERE id = ?"
+        getConnection().use { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.setInt(1, position)
+                stmt.setString(2, id)
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    fun deletePerson(id: String) {
+        getConnection().use { conn ->
+            conn.prepareStatement("DELETE FROM person WHERE id=?").use {
+                it.setString(1, id); it.executeUpdate()
+            }
+        }
+    }
+
+    fun getAllPerson(): List<Person> {
+        val list = mutableListOf<Person>()
+        getConnection().use { conn ->
+            conn.prepareStatement(
+                "SELECT id, vorname, name, firma, bemerkung, COALESCE(position,0) AS position FROM person ORDER BY position ASC"
+            ).use { stmt ->
+                val rs = stmt.executeQuery()
+                while (rs.next()) {
+                    list += Person(
+                        id        = rs.getString("id"),
+                        vorname   = rs.getString("vorname"),
+                        name      = rs.getString("name"),
+                        firma     = rs.getString("firma"),
+                        bemerkung = rs.getString("bemerkung"),
+                        position  = rs.getInt("position")
+                    )
                 }
             }
         }
-
-        fun deletePerson(id: String) {
-            getConnection().use { conn ->
-                conn.prepareStatement("DELETE FROM person WHERE id=?").use {
-                    it.setString(1, id); it.executeUpdate()
-                }
-            }
-        }
-
-        fun getAllPerson(): List<Person> {
-            val list = mutableListOf<Person>()
-            getConnection().use { conn ->
-                conn.prepareStatement("SELECT * FROM person").use { stmt ->
-                    val rs = stmt.executeQuery()
-                    while (rs.next()) {
-                        list += Person(
-                            id = rs.getString("id"),
-                            vorname = rs.getString("vorname"),
-                            name = rs.getString("name"),
-                            firma = rs.getString("firma"),
-                            bemerkung = rs.getString("bemerkung")
-                        )
-                    }
-                }
-            }
-            return list
-        }
+        return list
+    }
 
         // Analog: CRUD für Fahrzeug
         fun insertFahrzeug(f: Fahrzeug) {

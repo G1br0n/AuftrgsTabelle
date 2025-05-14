@@ -5,19 +5,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Edit
+
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import elemente.GrayIconButton
 import models.Person
 import viewModel.MitarbeiterViewModel
 
-//M1 -------------------------  MitarbeiterView -------------------------
 @Composable
 fun MitarbeiterView(
     viewModel: MitarbeiterViewModel = remember { MitarbeiterViewModel() }
@@ -31,14 +30,6 @@ fun MitarbeiterView(
         bemerkungText = selected?.bemerkung.orEmpty()
     }
 
-
-
-
-
-
-
-
-
     Column(Modifier.fillMaxSize().padding(16.dp)) {
         // Add button above both columns
         Row(
@@ -46,8 +37,7 @@ fun MitarbeiterView(
             horizontalArrangement = Arrangement.End
         ) {
             GrayIconButton(
-                icon = Icons.Filled.Person,
-                label = "Mitarbeiter hinzufügen",
+                label = "✚👷🏼‍♂️ Mitarbeiter hinzufügen",
                 tooltip = "Neuen Mitarbeiter hinzufügen",
                 selected = false,
                 onClick = {
@@ -58,28 +48,45 @@ fun MitarbeiterView(
         }
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxSize()) {
-            // Left: employee list
+            // Left: employee list with up/down arrows
             Column(Modifier.weight(3f)) {
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     itemsIndexed(personen) { index, p ->
-                        Button(
-                            onClick = {
-                                selected = p
-                                showForm = false
-                            },
-                            colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF555555)),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 0.dp)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text(
-                                text = "${index + 1}. ${p.vorname.orEmpty()} ${p.name.orEmpty()} (${p.firma.orEmpty()})",
-                                fontSize = 16.sp,
-                                color = Color.White,
-                                textAlign = TextAlign.Start,
-                                modifier = Modifier.fillMaxWidth()
+                            Button(
+                                onClick = {
+                                    selected = p
+                                    showForm = false
+                                },
+                                colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFF555555)),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = "${index + 1}. ${p.vorname.orEmpty()} ${p.name.orEmpty()} (${p.firma.orEmpty()})",
+                                    fontSize = 16.sp,
+                                    color = Color.White
+                                )
+                            }
+                            Spacer(Modifier.width(4.dp))
+                            // Up arrow button
+                            GrayIconButton(
+                                label = "⬆️",
+                                   selected = false,
+                                enabled = index > 0,
+                                onClick = { if (index > 0) viewModel.movePerson(index, index - 1) }
+                            )
+                            Spacer(Modifier.width(4.dp))
+                            // Down arrow button
+                            GrayIconButton(
+                                label = "⬇️",
+                                selected = false,
+                                enabled = index < personen.lastIndex,
+                                onClick = { if (index < personen.lastIndex) viewModel.movePerson(index, index + 1) }
                             )
                         }
                     }
@@ -96,17 +103,17 @@ fun MitarbeiterView(
                         onSave = { person ->
                             if (selected == null) {
                                 viewModel.addPerson(
-                                    vorname   = person.vorname.orEmpty(),
-                                    name      = person.name.orEmpty(),
-                                    firma     = person.firma,
+                                    vorname = person.vorname.orEmpty(),
+                                    name = person.name.orEmpty(),
+                                    firma = person.firma,
                                     bemerkung = person.bemerkung
                                 )
                             } else {
                                 viewModel.updatePerson(
-                                    id        = person.id,
-                                    vorname   = person.vorname.orEmpty(),
-                                    name      = person.name.orEmpty(),
-                                    firma     = person.firma,
+                                    id = person.id,
+                                    vorname = person.vorname.orEmpty(),
+                                    name = person.name.orEmpty(),
+                                    firma = person.firma,
                                     bemerkung = person.bemerkung
                                 )
                             }
@@ -127,10 +134,10 @@ fun MitarbeiterView(
                             onValueChange = { newVal ->
                                 bemerkungText = newVal
                                 viewModel.updatePerson(
-                                    id        = p.id,
-                                    vorname   = p.vorname.orEmpty(),
-                                    name      = p.name.orEmpty(),
-                                    firma     = p.firma,
+                                    id = p.id,
+                                    vorname = p.vorname.orEmpty(),
+                                    name = p.name.orEmpty(),
+                                    firma = p.firma,
                                     bemerkung = newVal.takeIf { it.isNotBlank() }
                                 )
                             },
@@ -148,13 +155,10 @@ fun MitarbeiterView(
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             GrayIconButton(
-                                icon = Icons.Filled.Edit,
-                                label = "Mitarbeiter bearbeiten",
+                                label = "⚙️Mitarbeiter bearbeiten",
                                 tooltip = "Mitarbeiter bearbeiten",
                                 selected = false,
-                                onClick = {
-                                    showForm = true
-                                }
+                                onClick = { showForm = true }
                             )
                         }
                     } ?: Text("Wählen Sie einen Mitarbeiter aus", style = MaterialTheme.typography.body1)
@@ -163,7 +167,6 @@ fun MitarbeiterView(
         }
     }
 }
-
 
 //M1 -------------------------  MitarbeiterForm() -------------------------
 @Composable

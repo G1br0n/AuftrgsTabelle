@@ -1,6 +1,7 @@
         package ui
 
         import androidx.compose.foundation.*
+
         import androidx.compose.foundation.gestures.detectTapGestures
         import androidx.compose.foundation.layout.*
         import androidx.compose.foundation.lazy.LazyColumn
@@ -18,8 +19,12 @@
         import androidx.compose.ui.graphics.drawscope.withTransform
         import androidx.compose.ui.graphics.graphicsLayer
         import androidx.compose.ui.graphics.vector.ImageVector
+        import androidx.compose.ui.input.key.Key.Companion.R
         import androidx.compose.ui.input.pointer.pointerInput
+        import androidx.compose.ui.layout.ContentScale
         import androidx.compose.ui.platform.LocalDensity
+        import androidx.compose.ui.res.painterResource
+        import androidx.compose.ui.res.useResource
         import androidx.compose.ui.text.ExperimentalTextApi
         import androidx.compose.ui.text.TextStyle
         import androidx.compose.ui.text.drawText
@@ -33,6 +38,7 @@
         import repository.AuftragRepository
         import models.Auftrag
         import models.Schicht
+        import org.jetbrains.skia.Bitmap
         import view.*
         import java.time.Duration
         import java.time.LocalDateTime
@@ -66,10 +72,18 @@
 
         @Composable
         private fun NavigationBar(selected: Screen, onSelect: (Screen) -> Unit) {
+
+
+
             Column(
                 Modifier.width(220.dp).fillMaxHeight().padding(16.dp),
                 Arrangement.spacedBy(8.dp)
             ) {
+
+
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 listOf(
                     Screen.Auftraege, Screen.Mitarbeiter, Screen.Fahrzeuge,
                     Screen.Material, Screen.Diagram
@@ -586,7 +600,6 @@
                 }
             }
         }
-
 
 
 

@@ -43,13 +43,15 @@
         )
 
 
-        data class Person (
+        data class Person(
             val id: String = UUID.randomUUID().toString(),
             val vorname: String?,
             val name: String?,
             val firma: String?,
-            val bemerkung: String?
+            val bemerkung: String?,
+            val position: Int = 0            // NEU
         )
+
 
         data class Fahrzeug (
             val id: String = UUID.randomUUID().toString(),

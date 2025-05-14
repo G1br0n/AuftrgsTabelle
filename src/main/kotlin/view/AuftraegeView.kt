@@ -3,10 +3,13 @@
 
     import androidx.compose.animation.animateContentSize
     import androidx.compose.foundation.BorderStroke
+    import androidx.compose.foundation.background
     import androidx.compose.foundation.clickable
     import androidx.compose.foundation.layout.*
     import androidx.compose.foundation.lazy.LazyColumn
     import androidx.compose.foundation.lazy.items
+    import androidx.compose.foundation.lazy.itemsIndexed
+    import androidx.compose.foundation.shape.CircleShape
     import androidx.compose.material.*
     import androidx.compose.material.icons.Icons
     import androidx.compose.material.icons.filled.*
@@ -18,6 +21,7 @@
     import androidx.compose.ui.text.input.TextFieldValue
     import androidx.compose.ui.unit.DpSize
     import androidx.compose.ui.unit.dp
+    import androidx.compose.ui.unit.sp
     import androidx.compose.ui.window.*
     import elemente.DatePickerField
     import elemente.DateTimePickerField
@@ -50,7 +54,6 @@
     fun AuftraegeView(
         viewModel: AuftraegeViewModel = remember { AuftraegeViewModel() }
     ) {
-
         val windowState = rememberWindowState(
             size = DpSize(width = 1200.dp, height = 900.dp)
         )
@@ -61,6 +64,7 @@
         var selectedAuftragId by remember { mutableStateOf<String?>(null) }
         var selectedSchichtId by remember { mutableStateOf<String?>(null) }
         var filterText by remember { mutableStateOf("") }
+
         // Dynamisch aktuelles Objekt ermitteln
         val selectedAuftrag = selectedAuftragId?.let { id ->
             auftraege.find { it.id == id }
@@ -119,23 +123,27 @@
                 Spacer(Modifier.height(GAP_S))
                 Text("Auftragsliste", style = MaterialTheme.typography.h6)
                 Spacer(Modifier.height(GAP_XS))
+
+                // Hier itemsIndexed verwenden und Nummer umkehren
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(GAP_S)) {
-                    items(
-                        items = displayed,          // statt: items = auftraege
-                        key = { it.id }
-                    ) { a ->
-                        val isSelected = a.id == selectedAuftragId
+                    itemsIndexed(
+                        items = displayed,
+                        key = { _, auftrag -> auftrag.id }
+                    ) { idx, auftrag ->
+                        val isSelected = auftrag.id == selectedAuftragId
+                        // umgekehrte Nummer: Gesamtzahl minus aktueller Index
+                        val number = displayed.size - idx
                         AuftragCard(
-                            auftrag = a,
-                            index = auftraege.indexOf(a) + 1,
+                            auftrag  = auftrag,
+                            index    = number,
                             selected = isSelected,
                             onSelect = {
-                                selectedAuftragId = a.id
+                                selectedAuftragId = auftrag.id
                                 selectedSchichtId = null
                             },
-                            onEdit = {
-                                selectedAuftragId = a.id
-                                showAuftragForm = true
+                            onEdit   = {
+                                selectedAuftragId = auftrag.id
+                                showAuftragForm   = true
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -907,7 +915,7 @@
         onEdit:   () -> Unit,
         modifier: Modifier = Modifier,
         dateTimeFmt: DateTimeFormatter =
-            DateTimeFormatter.ofPattern("dd.MM.yyyy")
+            DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
     ) {
         /* – Farben unverändert – */
         val grayNormal   = Color(0xFF555555)
@@ -939,25 +947,21 @@
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
 
-                    /* Kopfzeile: S/A-Nummer */
-                    Text(
-                        "${index}. S/A‑Nr.: ${auftrag.sapANummer.orEmpty()}",
-                        style = MaterialTheme.typography.subtitle1,
-                        color = Color.Yellow
-                    )
-
-                    /* 𝗡𝗘𝗨: immer sichtbares Lieferdatum */
-                    Text("Lieferdatum: $startTxt", color = txtColor)
-
-                    /* WeitereInfos */
-
-                    Text("Schichten: $schichtCount",color = txtColor)
-                    Text("Maßnahme:  ${auftrag.massnahme}", color = txtColor)
-
-                    /* Spacer schiebt Bemerkung nach ganz unten */
+                    Row {
+                        Text(
+                            "${index}. 📋: ${auftrag.sapANummer.orEmpty()}     ",
+                            style = MaterialTheme.typography.subtitle1,
+                            color = Color.Yellow
+                        )
+                        Text("🛠️: $schichtCount",color = txtColor)
+                    }
+                    Text("    📅: $startTxt", color = txtColor)
+                    if(auftrag.massnahme?.toList()?.isEmpty() != true){
+                        Text("Maßnahme:  ${auftrag.massnahme}", color = txtColor)
+                    }
 
 
-                    /* Bemerkung steht jetzt ganz unten */
+
                     if (!auftrag.bemerkung.isNullOrEmpty()) {
                         Text(
                             "Bemerkung: ${auftrag.bemerkung}",
@@ -968,15 +972,20 @@
                 }
 
                 /* -------- rechte Spalte: Bearbeiten‑Button -------- */
-                Column(Modifier.weight(2f)) {
-                    GrayIconButton(
-                        icon     = Icons.Default.Edit,
-                        label    = "",
-                        tooltip  = "Auftrag bearbeiten",
-                        selected = false,
-                        onClick  = onEdit
-                    )
+                Column(Modifier.weight(1f)) {
+                    IconButton(
+                        onClick = onEdit,
+                        modifier = Modifier
+                            .size(36.dp)                      // Größe anpassen
+                            .background(grayNormal, shape = CircleShape) // optionaler Hintergrund
+                    ) {
+                        Text(
+                            "⚙️",
+                            fontSize = 20.sp,                // Schriftgröße anpassen
+                        )
+                    }
                 }
+
             }
         }
     }
