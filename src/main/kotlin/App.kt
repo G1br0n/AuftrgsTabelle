@@ -9,6 +9,7 @@
         import androidx.compose.material.*
         import androidx.compose.material.icons.Icons
         import androidx.compose.material.icons.filled.*
+
         import androidx.compose.runtime.*
         import androidx.compose.ui.Alignment
         import androidx.compose.ui.Modifier
@@ -18,6 +19,7 @@
         import androidx.compose.ui.graphics.drawscope.Stroke
         import androidx.compose.ui.graphics.drawscope.withTransform
         import androidx.compose.ui.graphics.graphicsLayer
+        import androidx.compose.ui.graphics.toArgb
         import androidx.compose.ui.graphics.vector.ImageVector
         import androidx.compose.ui.input.key.Key.Companion.R
         import androidx.compose.ui.input.pointer.pointerInput
@@ -40,6 +42,7 @@
         import models.Schicht
         import org.jetbrains.skia.Bitmap
         import view.*
+        import java.time.DayOfWeek
         import java.time.Duration
         import java.time.LocalDateTime
         import java.time.format.DateTimeFormatter
@@ -63,10 +66,10 @@
 
         sealed class Screen(val label: String, val icon: ImageVector) {
             object Auftraege   : Screen("📋 Aufträge", Icons.Filled.Menu)
+            object Diagram     : Screen("📈 Diagram", Icons.Filled.Edit)
             object Mitarbeiter : Screen("👷🏾‍♂️ Mitarbeiter", Icons.Filled.Person)
             object Fahrzeuge   : Screen("🚘 Fahrzeuge", Icons.Filled.Edit)
             object Material    : Screen("🛠️ Materialien", Icons.Filled.Build)
-            object Diagram     : Screen("📈 Diagram", Icons.Filled.Edit)
         }
 
 
@@ -85,8 +88,11 @@
                 Spacer(modifier = Modifier.height(16.dp))
 
                 listOf(
-                    Screen.Auftraege, Screen.Mitarbeiter, Screen.Fahrzeuge,
-                    Screen.Material, Screen.Diagram
+                    Screen.Auftraege,
+                    Screen.Diagram,
+                    Screen.Mitarbeiter,
+                    Screen.Fahrzeuge,
+                    Screen.Material,
                 )
                     .forEach { screen ->
                         GrayIconButton(
@@ -105,14 +111,14 @@
             Box(modifier.fillMaxSize().padding(12.dp)) {
                 when (screen) {
                     Screen.Auftraege   -> AuftraegeView()
-                    Screen.Mitarbeiter -> MitarbeiterView()
-                    Screen.Fahrzeuge   -> FahrzeugeView()
-                    Screen.Material    -> MaterialView()
                     Screen.Diagram     -> {
                         val repo = remember { AuftragRepository() }
                         val auftraege = remember { repo.getAllAuftraege() }
                         ZoomableGanttDiagram(auftraege)
                     }
+                    Screen.Mitarbeiter -> MitarbeiterView()
+                    Screen.Fahrzeuge   -> FahrzeugeView()
+                    Screen.Material    -> MaterialView()
                 }
             }
         }
@@ -125,20 +131,39 @@
         private val ROW_HEIGHT_DP      = 36.dp              // Zeilenhöhe
         private const val MAX_COMPOSE_PX = 262_000f         // 18-Bit-Grenze Compose
 
+        fun drabcode(base: Color, highlighted: Boolean): Pair<Color,Color> {
+            // ARGB-Int des Basis-Colors
+            val baseArgb = base.toArgb() and 0x00FFFFFF
+            // gewünschte Alpha-Werte
+            val fillAlpha   = if (highlighted) 0x66 else 0xB3
+            val borderAlpha = 0xFF
+            // neues Color-Objekt aus Alpha-Hex + Farb-RGB
+            val fillColor   = Color((fillAlpha shl 24) or baseArgb)
+            val borderColor = Color((borderAlpha shl 24) or baseArgb)
+            return fillColor to borderColor
+        }
+
         enum class TimeScale(
             val label: String,
             val minutesPerUnit: Float,
             val unitWidth: Dp,
             val formatter: DateTimeFormatter,
         ) {
-            HOUR ("Stunde",  60f,   28.dp, DateTimeFormatter.ofPattern("HH:mm", Locale.GERMANY)), // ← HIER
-            DAY  ("Tag",    1440f,  28.dp, DateTimeFormatter.ofPattern("dd.MM", Locale.GERMANY)),
-            WEEK ("Woche",  10080f, 28.dp, DateTimeFormatter.ofPattern("'KW' w", Locale.GERMANY)),
-            MONTH("Monat",  43200f, 28.dp, DateTimeFormatter.ofPattern("MMM", Locale.GERMANY));
+            H1  ("1 Std.",    60f,    28.dp, DateTimeFormatter.ofPattern("HH:mm", Locale.GERMANY)),
+            H2  ("2 Std.",   120f,    28.dp, DateTimeFormatter.ofPattern("HH:mm", Locale.GERMANY)),
+            H3  ("3 Std.",   180f,    28.dp, DateTimeFormatter.ofPattern("HH:mm", Locale.GERMANY)),
+            H4  ("4 Std.",   240f,    28.dp, DateTimeFormatter.ofPattern("HH:mm", Locale.GERMANY)),
+            H6  ("6 Std.",   360f,    28.dp, DateTimeFormatter.ofPattern("HH:mm", Locale.GERMANY)),
+            H8  ("8 Std.",   480f,    28.dp, DateTimeFormatter.ofPattern("HH:mm", Locale.GERMANY)),
+            H12 ("12 Std.",  720f,    28.dp, DateTimeFormatter.ofPattern("HH:mm", Locale.GERMANY)),
+            DAY ("Tag",    1440f,    28.dp, DateTimeFormatter.ofPattern("dd.MM", Locale.GERMANY)),
+            WEEK("Woche", 10080f,    28.dp, DateTimeFormatter.ofPattern("'KW' w", Locale.GERMANY)),
+            MONTH("Monat",43200f,    28.dp, DateTimeFormatter.ofPattern("MMM", Locale.GERMANY));
 
             fun zoomIn()  = values().getOrNull(ordinal - 1) ?: this
             fun zoomOut() = values().getOrNull(ordinal + 1) ?: this
         }
+
 
 
 
@@ -212,7 +237,6 @@
                 val random = Random(0)
                 auftraege.associate { it.id to Color(random.nextFloat(), random.nextFloat(), random.nextFloat()) }
             }
-
             val minStart = remember(auftraege) {
                 auftraege.flatMap { it.schichten.orEmpty() }
                     .mapNotNull { it.startDatum }
@@ -220,6 +244,10 @@
                     ?.withMinute(0)?.withSecond(0)?.withNano(0)
                     ?: LocalDateTime.now().withMinute(0).withSecond(0).withNano(0)
             }
+// ganz oben in BaseGanttDiagram, nach minStart und end:
+
+
+// ganz oben in BaseGanttDiagram, nach minStart und end:
 
             val end = remember(auftraege) {
                 auftraege.flatMap { it.schichten.orEmpty() }
@@ -229,8 +257,22 @@
                     ?: LocalDateTime.now().withMinute(0).withSecond(0).withNano(0)
             }
 
-            val durationMinutes = Duration.between(minStart, end).toMinutes()
-            val tickCount = (durationMinutes / timeScale.minutesPerUnit).toInt() + 1
+            // 1) gridStart: auf Mitternacht zurücksetzen, wenn 4h/8h/12h-Skala
+            val gridStart = remember(minStart, timeScale) {
+                if (timeScale in listOf(TimeScale.H4, TimeScale.H8, TimeScale.H12)) {
+                    minStart
+                        .withHour(0)
+                        .withMinute(0)
+                        .withSecond(0)
+                        .withNano(0)
+                } else {
+                    minStart
+                }
+            }
+
+            // 2) Dauer von gridStart bis Endzeitpunkt
+            val durationMinutes = Duration.between(gridStart, end).toMinutes()
+            val tickCount      = (durationMinutes / timeScale.minutesPerUnit).toInt() + 1
 
             val unitWidthPx = with(density) { timeScale.unitWidth.toPx() }
             val rawCanvasWidthPx = tickCount * unitWidthPx
@@ -245,6 +287,9 @@
 
             val headerHeightDp = 150.dp
             val totalHeaderWidthDp = with(density) { canvasWidthPx.toDp() }
+
+
+
 
             LaunchedEffect(canvasWidthPx) {
                 val now = LocalDateTime.now()
@@ -297,13 +342,13 @@
                             .height(headerHeightDp)
                     ) {
                         HeaderComposableRow(
-                            minStart = minStart,
-                            timeScale = timeScale,
+                            gridStart    = gridStart,        // hier den neuen gridStart übergeben
+                            timeScale    = timeScale,
                             scaledUnitPx = scaledUnitPx,
-                            tickCount = tickCount,
-                            zoom = with(density) { scaledUnitPx.toDp() },
-                            rotate = true,
-                            height = headerHeightDp
+                            tickCount    = tickCount,
+
+                            rotate       = true,
+                            height       = headerHeightDp,
                         )
                     }
 
@@ -340,60 +385,63 @@
                                 }
                         ) {
                             Canvas(modifier = Modifier.fillMaxSize()) {
+                                val rowHeightPx = rowHeight.toPx()
+
+                                // 1) Rasterlinien
                                 repeat(tickCount + 1) { i ->
                                     val x = i * scaledUnitPx
                                     drawLine(
-                                        color = Color.LightGray,
-                                        start = Offset(x, 0f),
-                                        end = Offset(x, size.height),
+                                        color       = Color.LightGray,
+                                        start       = Offset(x, 0f),
+                                        end         = Offset(x, size.height),
                                         strokeWidth = 1f
                                     )
                                 }
 
+                                // 2) Balken
                                 auftraege.forEachIndexed { row, auftrag ->
-                                    val y0 = row * rowHeight.toPx() + 2f
-                                    val barHeight = rowHeight.toPx() - 4f
-                                    val color = auftragFarben[auftrag.id] ?: Color.Blue
+                                    val y0        = row * rowHeightPx + 2f
+                                    val barHeight = rowHeightPx - 4f
+                                    val baseColor = auftragFarben[auftrag.id] ?: Color(0xFF2196F3)
 
                                     auftrag.schichten.orEmpty().forEach { s ->
                                         val st = s.startDatum ?: return@forEach
-                                        val en = s.endDatum ?: return@forEach
-                                        val xStart = (Duration.between(minStart, st).toMinutes() / timeScale.minutesPerUnit) * scaledUnitPx
-                                        val xEnd = (Duration.between(minStart, en).toMinutes() / timeScale.minutesPerUnit) * scaledUnitPx
+                                        val en = s.endDatum   ?: return@forEach
+
+                                        val xStart = (Duration.between(gridStart, st).toMinutes() / timeScale.minutesPerUnit) * scaledUnitPx
+                                        val xEnd   = (Duration.between(gridStart, en).toMinutes()   / timeScale.minutesPerUnit) * scaledUnitPx
 
                                         val isHighlighted = s == highlightedSchicht
-                                        val fillColor = if (isHighlighted) color.copy(alpha = 0.4f) else color.copy(alpha = 0.7f)
-                                        val borderColor = if (isHighlighted) color.copy(alpha = 1f) else color
+                                        val (fillColor, borderColor) = drabcode(baseColor, isHighlighted)
 
                                         drawRect(
-                                            color = fillColor,
+                                            color   = fillColor,
                                             topLeft = Offset(xStart, y0),
-                                            size = androidx.compose.ui.geometry.Size(xEnd - xStart, barHeight)
+                                            size    = androidx.compose.ui.geometry.Size(xEnd - xStart, barHeight)
                                         )
                                         drawRect(
-                                            color = borderColor,
+                                            color   = borderColor,
                                             topLeft = Offset(xStart, y0),
-                                            size = androidx.compose.ui.geometry.Size(xEnd - xStart, barHeight),
-                                            style = Stroke(1.5f)
+                                            size    = androidx.compose.ui.geometry.Size(xEnd - xStart, barHeight),
+                                            style   = Stroke(width = 1.5f)
                                         )
-                                        // Rote Linie für aktuelles Datum/Zeit
-
-                                        if (currentTime.isAfter(minStart) && currentTime.isBefore(end)) {
-                                            val offsetMinutes = Duration.between(minStart, currentTime).toMinutes()
-                                            val xNow = (offsetMinutes / timeScale.minutesPerUnit) * scaledUnitPx
-                                            drawLine(
-                                                color = Color.Red,
-                                                start = Offset(xNow, 0f),
-                                                end = Offset(xNow, size.height),
-                                                strokeWidth = 2f
-                                            )
-                                        }
-
-
-
                                     }
                                 }
+
+                                // 3) Rote Linie für die aktuelle Zeit
+                                if (currentTime.isAfter(gridStart) && currentTime.isBefore(end)) {
+                                    val offsetMinutes = Duration.between(gridStart, currentTime).toMinutes()
+                                    val xNow = (offsetMinutes / timeScale.minutesPerUnit) * scaledUnitPx
+                                    drawLine(
+                                        color       = Color.Red,
+                                        start       = Offset(xNow, 0f),
+                                        end         = Offset(xNow, size.height),
+                                        strokeWidth = 4f
+                                    )
+                                }
                             }
+
+
                         }
                     }
                 }
@@ -504,39 +552,34 @@
         }
 
 
-
         @Composable
         fun HeaderComposableRow(
-            minStart: LocalDateTime,
+            gridStart: LocalDateTime,
             timeScale: TimeScale,
             scaledUnitPx: Float,
             tickCount: Int,
-            zoom: Dp,
             rotate: Boolean = true,
             height: Dp
         ) {
             val density = LocalDensity.current
             val unitWidthDp = with(density) { scaledUnitPx.toDp() }
 
-            val tickLabels = remember(minStart, timeScale, tickCount) {
+            // anstelle von minStart hier gridStart übergeben!
+            val tickLabels = remember(gridStart, timeScale, tickCount) {
                 val ticks = mutableListOf<TickLabel>()
-                var tick = minStart
+                var tick = gridStart
 
                 repeat(tickCount) {
                     val label = tick.format(timeScale.formatter)
-                    val groupLabel = when (timeScale) {
-                        TimeScale.HOUR  -> if (tick.hour == 0) tick.format(DateTimeFormatter.ofPattern("EEE dd.MM", Locale.GERMANY)) else null
-                        TimeScale.DAY   -> if (tick.dayOfWeek == java.time.DayOfWeek.MONDAY) "KW ${tick.format(DateTimeFormatter.ofPattern("w"))}" else null
-                        TimeScale.WEEK  -> tick.format(DateTimeFormatter.ofPattern("MMM yyyy", Locale.GERMANY))
-                        TimeScale.MONTH -> tick.format(DateTimeFormatter.ofPattern("yyyy", Locale.GERMANY))
+                    val groupLabel = when {
+                        // alle Stunden-Skalen: Mitternachts-Datum anzeigen
+                        timeScale.minutesPerUnit < 1440f && tick.hour == 0 ->
+                            tick.format(DateTimeFormatter.ofPattern("EEE dd.MM", Locale.GERMANY))
+                        // deine bestehenden Regeln für DAY, WEEK, MONTH …
+                        else -> null
                     }
                     ticks += TickLabel(label, groupLabel)
-                    tick = when (timeScale) {
-                        TimeScale.HOUR  -> tick.plusHours(1)
-                        TimeScale.DAY   -> tick.plusDays(1)
-                        TimeScale.WEEK  -> tick.plusWeeks(1)
-                        TimeScale.MONTH -> tick.plusMonths(1)
-                    }
+                    tick = tick.plusMinutes(timeScale.minutesPerUnit.toLong())
                 }
                 ticks
             }
@@ -561,17 +604,13 @@
                                 Box(
                                     modifier = Modifier
                                         .fillMaxHeight()
-                                        .graphicsLayer {
-                                            rotationZ = -90f
-                                            transformOrigin = TransformOrigin(0.5f, 0.5f)
-                                        }
+                                        .graphicsLayer { rotationZ = -90f }
                                         .wrapContentSize(unbounded = true)
                                 ) {
-                                    val text = tick.groupLabel?.let { "$it ${tick.label} " } ?: tick.label
+                                    val text = tick.groupLabel?.let { "$it ${tick.label}" } ?: tick.label
                                     Text(
                                         text = text,
                                         fontSize = 12.sp,
-                                        color = Color.Black,
                                         textAlign = TextAlign.Center,
                                         maxLines = 2,
                                         softWrap = true,
@@ -580,10 +619,8 @@
                                 }
                             } else {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(tick.label, fontSize = 12.sp, color = Color.Black)
-                                    tick.groupLabel?.let {
-                                        Text(it, fontSize = 10.sp, color = Color.DarkGray)
-                                    }
+                                    Text(tick.label, fontSize = 12.sp)
+                                    tick.groupLabel?.let { Text(it, fontSize = 10.sp, color = Color.DarkGray) }
                                 }
                             }
                         }
@@ -600,6 +637,7 @@
                 }
             }
         }
+
 
 
 

@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -18,6 +19,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
@@ -92,7 +95,6 @@ fun AuftraegeView(
                 GrayIconButton(
                     icon     = Icons.Default.Add,
                     label    = "Auftrag",
-                    tooltip  = "Neuen Auftrag anlegen",
                     selected = false,
                     onClick  = {
                         selectedAuftragId = null
@@ -101,6 +103,7 @@ fun AuftraegeView(
                 )
 
                 Spacer(Modifier.width(4.dp))
+
                 OutlinedTextField(
                     value = filterText,
                     onValueChange = { filterText = it },
@@ -158,16 +161,27 @@ fun AuftraegeView(
         /* Schichtenliste */
         Column(Modifier.weight(4f)) {
             selectedAuftrag?.let {
+
                 Spacer(Modifier.height(10.dp))
-                GrayIconButton(Icons.Default.Add, "Schicht", "Neue Schicht", false, onClick = {
+
+                GrayIconButton(
+                    Icons.Default.Add,
+                    label = "Schicht",
+                    tooltip = "Neue Schicht",
+                    selected = false,
+                    onClick = {
                     selectedSchichtId = null
                     showSchichtForm = true
                 })
+
                 Spacer(Modifier.height(GAP_S))
             }
             Spacer(Modifier.height(14.dp))
+
             Text("Schichtenliste", style = MaterialTheme.typography.h6)
+
             Spacer(Modifier.height(GAP_XS))
+
             LazyColumn(verticalArrangement = Arrangement.spacedBy(GAP_S)) {
                 items(
                     items = selectedAuftrag?.schichten.orEmpty(),
@@ -247,7 +261,7 @@ fun AuftraegeView(
         Dialog(
             onCloseRequest = { showAuftragForm = false },
             title = if (selectedAuftrag == null) "Neuer Auftrag" else "Auftrag bearbeiten",
-            state = rememberDialogState(width = 500.dp, height = 500.dp)
+            state = rememberDialogState(width = 500.dp, height = 700.dp)
         ) {
             AuftragForm(
                 initial = selectedAuftrag,
@@ -440,6 +454,8 @@ fun AuftragForm(
     vm: AuftraegeViewModel = remember { AuftraegeViewModel() }
 ) {
     val dateTimeFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var deletePassword by remember { mutableStateOf("") }
 
     // Internal state
     var sapVal by remember { mutableStateOf(initial?.sapANummer.orEmpty()) }
@@ -485,7 +501,7 @@ fun AuftragForm(
                 )
                 OutlinedTextField(
                     value = sapVal, onValueChange = { sapVal = it },
-                    label = { Text("SAP-A-Nummer") }, modifier = Modifier.fillMaxWidth()
+                    label = { Text("📋  Stempel-A-SAP-Nummer") }, modifier = Modifier.fillMaxWidth()
                 )
                 /*OutlinedTextField(
                     value = ortVal, onValueChange = { ortVal = it },
@@ -507,14 +523,14 @@ fun AuftragForm(
                 }*/
                 OutlinedTextField(
                     value = massnahmeVal, onValueChange = { massnahmeVal = it },
-                    label = { Text("Maßnahme") }, modifier = Modifier.fillMaxWidth()
+                    label = { Text("🏫  Maßnahme/Ort") }, modifier = Modifier.fillMaxWidth()
                 )
                 OutlinedTextField(
                     value = bemerkungVal, onValueChange = { bemerkungVal = it },
-                    label = { Text("Bemerkung") }, modifier = Modifier.fillMaxWidth()
+                    label = { Text("🚨  Bemerkung") }, modifier = Modifier.fillMaxWidth()
                 )
                 DateTimePickerField(
-                    label = "Liefer-Datum & Zeit (optional)",
+                    label = "📅  Start-Datum & Zeit (optional)",
                     initialDateTime = lieferDatum,
                     onDateTimeSelected = { lieferDatum = it },
                     modifier = Modifier.fillMaxWidth()
@@ -590,28 +606,82 @@ fun AuftragForm(
                }*/
         }
 
-        // Rest: action buttons
+        // Action buttons
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onCancel) { Text("Abbrechen") }
-            onDelete?.let { OutlinedButton(onClick = it) { Text("Löschen") } }
+            OutlinedButton(onClick = onCancel) {
+                Text("Abbrechen")
+            }
+            onDelete?.let {
+                // Fully red delete button
+                OutlinedButton(
+                    onClick = { showDeleteDialog = true },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        backgroundColor = Color(0xFFD32F2F),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Löschen")
+                }
+            }
             Spacer(Modifier.weight(1f))
             Button(
                 enabled = canSave,
                 onClick = {
                     onSave(
                         initial?.id,
-                        sapVal.trim(), ortVal.trim(), streckeVal.trim(),
-                        kmVonVal.trim(), kmBisVal.trim(), massnahmeVal.trim(), bemerkungVal.trim(),
-                        lieferDatum,
-                        modus,
-                        startDate, startTime,
-                        if (modus == WiederholungsModus.TAEGLICH) endDate else null,
-                        if (modus == WiederholungsModus.TAEGLICH) endTime else null,
-                        anzahlVal.toIntOrNull(), dauerVal.toLongOrNull()
+                        sapVal.trim(), "", "",
+                        "", "", massnahmeVal.trim(), bemerkungVal.trim(),
+                        lieferDatum, WiederholungsModus.KEINE,
+                        null, null, null, null, null, null
                     )
                 }
-            ) { Text("Speichern") }
+            ) {
+                Text("Speichern")
+            }
         }
+    }
+
+    // Single confirmation dialog with password input
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showDeleteDialog = false
+                deletePassword = ""
+            },
+            title = { Text("Löschen bestätigen") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Bitte Passwort eingeben, um zu bestätigen:")
+                    OutlinedTextField(
+                        value = deletePassword,
+                        onValueChange = { deletePassword = it },
+                        label = { Text("Passwort") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDelete?.invoke()
+                        showDeleteDialog = false
+                        deletePassword = ""
+                    },
+                    enabled = deletePassword == "test"
+                ) {
+                    Text("Löschen")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    deletePassword = ""
+                }) {
+                    Text("Abbrechen")
+                }
+            }
+        )
     }
 }
 
@@ -631,6 +701,10 @@ fun SchichtForm(
     // Formatter nur noch für Labels:
     val dateFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy")
     val timeFmt = DateTimeFormatter.ofPattern("HH:mm")
+
+    // State for deletion dialog and password
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var deletePassword by remember { mutableStateOf("") }
 
     // --- STATE für Datum & Zeit ---
     var startDate by remember { mutableStateOf(initial?.startDatum?.toLocalDate()) }
@@ -802,10 +876,23 @@ fun SchichtForm(
 
         Spacer(Modifier.height(16.dp))
 
-        // Aktion-Buttons (unverändert)
+        // Action buttons with delete and save
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            OutlinedButton(onClick = onCancel) { Text("Abbrechen") }
-            onDelete?.let { OutlinedButton(onClick = it) { Text("Löschen") } }
+            OutlinedButton(onClick = onCancel) {
+                Text("Abbrechen")
+            }
+            onDelete?.let {
+                // Fully red delete button
+                OutlinedButton(
+                    onClick = { showDeleteDialog = true },
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        backgroundColor = Color(0xFFD32F2F),
+                        contentColor = Color.White
+                    )
+                ) {
+                    Text("Löschen")
+                }
+            }
             Spacer(Modifier.weight(1f))
             Button(
                 enabled = startDT != null && endDT != null && !pauseErr,
@@ -832,6 +919,50 @@ fun SchichtForm(
                 Text("Speichern")
             }
         }
+    }
+
+    // Confirmation dialog for SchichtForm
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                showDeleteDialog = false
+                deletePassword = ""
+            },
+            title = { Text("Löschen bestätigen") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Bitte Passwort eingeben, um zu bestätigen:")
+                    OutlinedTextField(
+                        value = deletePassword,
+                        onValueChange = { deletePassword = it },
+                        label = { Text("Passwort") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDelete?.invoke()
+                        showDeleteDialog = false
+                        deletePassword = ""
+                    },
+                    enabled = deletePassword == "test"
+                ) {
+                    Text("Löschen")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    showDeleteDialog = false
+                    deletePassword = ""
+                }) {
+                    Text("Abbrechen")
+                }
+            }
+        )
+    }
 
         // Picker-Dialoge
         if (showPersonDlg) MultiSelectWindow(
@@ -862,7 +993,7 @@ fun SchichtForm(
             showFahrzeugDlg = false
         }
     }
-}
+
 
 
 
@@ -1031,7 +1162,7 @@ fun SchichtCard(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "${index}.",
+                    text = "${index}  Schicht",
                     style = MaterialTheme.typography.subtitle1,
                     color = Color.Yellow
                 )
@@ -1110,10 +1241,6 @@ fun SchichtCard(
 }
 
 
-
-/**
- * Ein neues Multi-Select-Fenster mit fester Höhe und Zähler oben.
- */
 @Composable
 fun <T> MultiSelectWindow(
     title: String,
@@ -1122,8 +1249,9 @@ fun <T> MultiSelectWindow(
     preSel: Set<T> = emptySet(),
     onResult: (Set<T>?) -> Unit
 ) {
-    // State hält jetzt ein unveränderliches Set
     var selected by remember { mutableStateOf(preSel) }
+    // 1) neuer State für den Filter-Text
+    var filterText by remember { mutableStateOf("") }
     val windowState = rememberWindowState(size = DpSize(600.dp, 600.dp))
 
     Window(
@@ -1136,15 +1264,17 @@ fun <T> MultiSelectWindow(
             Text("$title (${selected.size} ausgewählt)", style = MaterialTheme.typography.h6)
             Spacer(Modifier.height(8.dp))
 
+            // 2) Liste nur mit Items, die zum Filter passen
             LazyColumn(Modifier.weight(1f)) {
-                items(items) { item ->
+                items(
+                    items = items
+                        .filter { label(it).contains(filterText, ignoreCase = true) }
+                ) { item ->
                     val isChecked = selected.contains(item)
                     Row(
                         Modifier
                             .fillMaxWidth()
                             .clickable {
-                                // Hier wird nun die State-Variable neu gesetzt,
-                                // Compose sieht eine andere Referenz und recomposed
                                 selected = if (isChecked) selected - item
                                 else selected + item
                             }
@@ -1154,7 +1284,6 @@ fun <T> MultiSelectWindow(
                         Checkbox(
                             checked = isChecked,
                             onCheckedChange = { checked ->
-                                // Genauso hier: neue Menge zuweisen
                                 selected = if (checked) selected + item
                                 else selected - item
                             }
@@ -1167,11 +1296,29 @@ fun <T> MultiSelectWindow(
 
             Divider()
             Spacer(Modifier.height(8.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                OutlinedButton(onClick = { onResult(null) }) { Text("Abbrechen") }
+
+            // 3) Bottom-Row: links das Filter-Feld, rechts die Buttons
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = filterText,
+                    onValueChange = { filterText = it },
+                    label = { Text("Filter") },
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
                 Spacer(Modifier.width(8.dp))
-                Button(onClick = { onResult(selected) })   { Text("Übernehmen") }
+                OutlinedButton(onClick = { onResult(null) }) {
+                    Text("Abbrechen")
+                }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = { onResult(selected) }) {
+                    Text("Übernehmen")
+                }
             }
         }
     }
 }
+
