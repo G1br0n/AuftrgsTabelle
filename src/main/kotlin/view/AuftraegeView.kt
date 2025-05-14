@@ -955,16 +955,16 @@
                         )
                         Text("🛠️: $schichtCount",color = txtColor)
                     }
-                    Text("    📅: $startTxt", color = txtColor)
+                    Text("    📅: $startTxt", color = Color.Green)
                     if(auftrag.massnahme?.toList()?.isEmpty() != true){
-                        Text("Maßnahme:  ${auftrag.massnahme}", color = txtColor)
+                        Text("    🏫:  ${auftrag.massnahme}", color = txtColor)
                     }
 
 
 
                     if (!auftrag.bemerkung.isNullOrEmpty()) {
                         Text(
-                            "Bemerkung: ${auftrag.bemerkung}",
+                            "    🚨: ${auftrag.bemerkung}",
                             color = txtColor
                         )
                     }
