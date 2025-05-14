@@ -252,7 +252,7 @@
             Dialog(
                 onCloseRequest = { showAuftragForm = false },
                 title = if (selectedAuftrag == null) "Neuer Auftrag" else "Auftrag bearbeiten",
-                state = rememberDialogState(width = 1000.dp, height = 800.dp)
+                state = rememberDialogState(width = 500.dp, height = 500.dp)
             ) {
                 AuftragForm(
                     initial = selectedAuftrag,
@@ -492,7 +492,7 @@
                         value = sapVal, onValueChange = { sapVal = it },
                         label = { Text("SAP-A-Nummer") }, modifier = Modifier.fillMaxWidth()
                     )
-                    OutlinedTextField(
+                    /*OutlinedTextField(
                         value = ortVal, onValueChange = { ortVal = it },
                         label = { Text("Ort") }, modifier = Modifier.fillMaxWidth()
                     )
@@ -509,7 +509,7 @@
                             value = kmBisVal, onValueChange = { kmBisVal = it },
                             label = { Text("Km bis") }, modifier = Modifier.weight(1f)
                         )
-                    }
+                    }*/
                     OutlinedTextField(
                         value = massnahmeVal, onValueChange = { massnahmeVal = it },
                         label = { Text("Maßnahme") }, modifier = Modifier.fillMaxWidth()
@@ -527,7 +527,7 @@
                 }
 
                 // Right column: repetition settings
-                Column(
+             /*   Column(
                     Modifier.weight(1f),
 
                 ) {
@@ -592,7 +592,7 @@
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
-                }
+                }*/
             }
 
             // Rest: action buttons
