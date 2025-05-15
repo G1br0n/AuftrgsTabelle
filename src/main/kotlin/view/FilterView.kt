@@ -163,10 +163,26 @@ fun FilterScreen() {
         }
 
         // Datumsauswahl
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DatePickerField("Start Datum", vm.startDate, { vm.startDate = it })
-            DatePickerField("End Datum", vm.endDate, { vm.endDate = it })
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            DatePickerField(
+                "Start Datum",
+                vm.startDate,
+                { vm.startDate = it },
+                modifier = Modifier.weight(1f)
+            )
+            DatePickerField(
+                "End Datum",
+                vm.endDate,
+                { vm.endDate = it },
+                modifier = Modifier.weight(1f)
+            )
         }
+
 
         when (vm.filterType) {
             FilterType.AUFTRAG -> {
