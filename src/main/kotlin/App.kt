@@ -70,6 +70,7 @@
             object Mitarbeiter : Screen("👷🏾‍♂️ Mitarbeiter", Icons.Filled.Person)
             object Fahrzeuge   : Screen("🚘 Fahrzeuge", Icons.Filled.Edit)
             object Material    : Screen("🛠️ Materialien", Icons.Filled.Build)
+            object FilterView    : Screen("🔎 Filter", Icons.Filled.Build)
         }
 
 
@@ -93,6 +94,7 @@
                     Screen.Mitarbeiter,
                     Screen.Fahrzeuge,
                     Screen.Material,
+                    Screen.FilterView
                 )
                     .forEach { screen ->
                         GrayIconButton(
@@ -119,6 +121,7 @@
                     Screen.Mitarbeiter -> MitarbeiterView()
                     Screen.Fahrzeuge   -> FahrzeugeView()
                     Screen.Material    -> MaterialView()
+                    Screen.FilterView -> FilterScreen()
                 }
             }
         }
