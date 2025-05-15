@@ -15,6 +15,8 @@ import java.time.format.DateTimeFormatter
 import java.time.Duration
 import java.util.Locale
 import elemente.DatePickerField
+import elemente.GrayContentButton
+import elemente.GrayFillButton
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -150,12 +152,13 @@ fun FilterScreen() {
         // Filter-Typ-Auswahl
         Row {
             FilterType.values().forEach { t ->
-                Button(
+                GrayContentButton(
+                    label = t.label,
+                    tooltip = t.label,
+                    selected = vm.filterType == t,
                     onClick = { vm.filterType = t },
                     modifier = Modifier.padding(end = 8.dp)
-                ) {
-                    Text(t.label)
-                }
+                )
             }
         }
 
@@ -250,8 +253,12 @@ fun FilterScreen() {
             }
         }
 
-        Button(onClick = { vm.applyFilter() }, Modifier.fillMaxWidth()) {
-            Text("Filter Anwenden")
-        }
+        GrayFillButton(
+            label = "Filter Anwenden",
+            tooltip = "Filter auf die Daten anwenden",
+            selected = false,
+            onClick = { vm.applyFilter() },
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
