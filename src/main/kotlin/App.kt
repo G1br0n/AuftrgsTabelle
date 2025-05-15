@@ -66,7 +66,7 @@
 
         sealed class Screen(val label: String, val icon: ImageVector) {
             object Auftraege   : Screen("📋 Aufträge", Icons.Filled.Menu)
-            object Diagram     : Screen("📈 Diagram", Icons.Filled.Edit)
+            object Diagram     : Screen("📅 Kalender", Icons.Filled.Edit)
             object Mitarbeiter : Screen("👷🏾‍♂️ Mitarbeiter", Icons.Filled.Person)
             object Fahrzeuge   : Screen("🚘 Fahrzeuge", Icons.Filled.Edit)
             object Material    : Screen("🛠️ Materialien", Icons.Filled.Build)
