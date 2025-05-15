@@ -225,7 +225,7 @@ fun FilterScreen() {
                     itemsIndexed(mr) { idx, r ->
                         val s = r.schicht.startDatum?.format(dtf)
                         val e = (r.schicht.endDatum ?: r.schicht.startDatum)?.format(dtf)
-                        Text("${idx+1}. $s - $e | Dauer: ${"%.2f".format(r.hours)} h | Pause: ${r.schicht.pausenZeit} min")
+                        Text("${idx+1}. ${r.auftrag.sapANummer} | $s - $e | Dauer: ${"%.2f".format(r.hours)} h | Pause: ${r.schicht.pausenZeit} min")
                     }
                 }
             }
