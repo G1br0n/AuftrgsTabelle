@@ -24,7 +24,12 @@ import java.time.LocalTime
 sealed class FilterResult
 
 data class AuftragResult(val auftrag: Auftrag) : FilterResult()
-data class MitarbeiterResult(val auftrag: Auftrag, val schicht: Schicht, val hours: Float) : FilterResult()
+data class MitarbeiterResult(
+    val auftrag: Auftrag,
+    val schicht: Schicht,
+    val mitarbeiter: Person,      // neu
+    val hours: Float
+) : FilterResult()
 data class FahrzeugResult(val auftrag: Auftrag, val schicht: Schicht) : FilterResult()
 data class MaterialResult(val auftrag: Auftrag, val schicht: Schicht) : FilterResult()
 
@@ -36,6 +41,7 @@ enum class FilterType(val label: String) {
     MATERIAL("Material")
 }
 
+
 // ViewModel für den Filter
 class FilterViewModel(private val repo: AuftragRepository) {
     var filterType by mutableStateOf(FilterType.AUFTRAG)
@@ -46,6 +52,9 @@ class FilterViewModel(private val repo: AuftragRepository) {
     var selectedFahrzeug by mutableStateOf<Fahrzeug?>(null)
     var selectedMaterial by mutableStateOf<Material?>(null)
     var results by mutableStateOf<List<FilterResult>>(emptyList())
+    var mitarbeiterQuery by mutableStateOf("")
+    var fahrzeugQuery by mutableStateOf("")
+    var materialQuery by mutableStateOf("")
 
     fun applyFilter() {
         val sd = startDate?.atStartOfDay()
@@ -57,14 +66,18 @@ class FilterViewModel(private val repo: AuftragRepository) {
                 .map { AuftragResult(it) }
 
             FilterType.MITARBEITER -> alle.flatMap { auftrag ->
-                auftrag.schichten.orEmpty().filter { sch ->
-                    selectedPerson?.let { p -> sch.mitarbeiter.any { it.id == p.id } } == true &&
-                            (sd == null || sch.startDatum?.isAfter(sd) == true) &&
-                            (ed == null || sch.startDatum?.isBefore(ed) == true)
-                }.map { sch ->
-                    val dur = Duration.between(sch.startDatum, sch.endDatum ?: sch.startDatum)
-                    val hours = kotlin.math.round(((dur.toMinutes() - sch.pausenZeit) / 60.0f) * 100) / 100f
-                    MitarbeiterResult(auftrag, sch, hours)
+                auftrag.schichten.orEmpty().flatMap { sch ->
+                    sch.mitarbeiter
+                        .filter { p -> mitarbeiterQuery.isBlank()
+                                || "${p.vorname} ${p.name}"
+                            .contains(mitarbeiterQuery, ignoreCase = true)
+                        }
+                        .map { p ->
+                            val dur = Duration.between(sch.startDatum, sch.endDatum ?: sch.startDatum)
+                            val hours = ( (dur.toMinutes() - sch.pausenZeit) / 60.0f )
+                                .let { kotlin.math.round(it * 100) / 100f }
+                            MitarbeiterResult(auftrag, sch, p, hours)
+                        }
                 }
             }
 
@@ -92,54 +105,60 @@ class FilterViewModel(private val repo: AuftragRepository) {
 @Composable
 fun <T> FilterableDropdown(
     items: List<T>,
+    text: String,
+    onTextChange: (String) -> Unit,
     selected: T?,
     onSelect: (T) -> Unit,
     label: String,
     labelFor: (T) -> String
 ) {
-    var text by remember { mutableStateOf(selected?.let(labelFor) ?: "") }
     var expanded by remember { mutableStateOf(false) }
 
-    val filtered = remember(text) {
-        if (text.isBlank()) items else items.filter { labelFor(it).contains(text, true) }
+    // Filtere die Items anhand des aktuellen Texts
+    val filtered = remember(text, items) {
+        if (text.isBlank()) items else items.filter { labelFor(it).contains(text, ignoreCase = true) }
     }
 
-    Box(Modifier.fillMaxWidth()) {
-        TextField(
-            value = text,
-            onValueChange = { text = it },
-            label = { Text(label) },
-            trailingIcon = {
-                IconButton(onClick = { expanded = !expanded }) {
-                   Text("🔎")
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
 
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-        ) {
-            filtered.forEach { item ->
-                DropdownMenuItem(
-                    text = { Text(labelFor(item)) },
-                    onClick = {
-                        text = labelFor(item)
-                        onSelect(item)
-                        expanded = false
+
+        Box(Modifier.fillMaxWidth()) {
+            TextField(
+                value = text,
+                onValueChange = { onTextChange(it) /* expanded bleibt unverändert */ },
+                label = { Text(label) },
+                trailingIcon = {
+                    IconButton(onClick = { expanded = !expanded }) {
+                        Text("🔎")
                     }
-                )
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+            ) {
+                filtered.forEach { item ->
+                    DropdownMenuItem(
+                        text = { Text(labelFor(item)) },
+                        onClick = {
+                            onSelect(item)
+                            onTextChange(labelFor(item))
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }
-}
+
 
 @ExperimentalMaterial3Api
 @Composable
 fun FilterScreen() {
     val repo = remember { AuftragRepository() }
     val vm = remember { FilterViewModel(repo) }
+
 
     val dtf = remember {
         DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm").withLocale(Locale.GERMANY)
@@ -188,7 +207,10 @@ fun FilterScreen() {
             FilterType.AUFTRAG -> {
                 FilterableDropdown(
                     items = repo.getAllAuftraege(),
-                    selected = vm.results.filterIsInstance<AuftragResult>().firstOrNull()?.auftrag,
+                    text = vm.sapANummer,                       // nimm den Text aus dem ViewModel
+                    onTextChange = { vm.sapANummer = it },      // schreib ihn bei jeder Eingabe zurück
+                    selected = vm.results.filterIsInstance<AuftragResult>()
+                        .firstOrNull()?.auftrag,
                     onSelect = { vm.sapANummer = it.sapANummer ?: "" },
                     label = "Auftrag",
                     labelFor = { it.sapANummer ?: it.id.toString() }
@@ -211,6 +233,8 @@ fun FilterScreen() {
             FilterType.MITARBEITER -> {
                 FilterableDropdown(
                     items = repo.getAllPerson(),
+                    text = vm.mitarbeiterQuery,                    // aktueller Text aus dem VM
+                    onTextChange = { vm.mitarbeiterQuery = it },   // schreib jede Eingabe ins VM
                     selected = vm.selectedPerson,
                     onSelect = { vm.selectedPerson = it },
                     label = "Mitarbeiter",
@@ -223,17 +247,25 @@ fun FilterScreen() {
                 Text("Schichten: $totalShifts | Stunden gesamt: ${"%.2f".format(totalHours)} h")
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     itemsIndexed(mr) { idx, r ->
+                        val name = "${r.mitarbeiter.vorname} ${r.mitarbeiter.name}"
                         val s = r.schicht.startDatum?.format(dtf)
                         val e = (r.schicht.endDatum ?: r.schicht.startDatum)?.format(dtf)
-                        Text("${idx+1}. ${r.auftrag.sapANummer} | $s - $e | Dauer: ${"%.2f".format(r.hours)} h | Pause: ${r.schicht.pausenZeit} min")
+                        Text(
+                            "${idx+1}. $name | ${r.auftrag.sapANummer} | $s - $e | Dauer: ${"%.2f".format(r.hours)} h | Pause: ${r.schicht.pausenZeit} min"
+                        )
                     }
                 }
             }
             FilterType.FAHRZEUG -> {
                 FilterableDropdown(
                     items = repo.getAllFahrzeug(),
+                    text = vm.fahrzeugQuery,                           // ➊
+                    onTextChange = { vm.fahrzeugQuery = it },          // ➋
                     selected = vm.selectedFahrzeug,
-                    onSelect = { vm.selectedFahrzeug = it },
+                    onSelect = {
+                        vm.selectedFahrzeug = it
+                        vm.fahrzeugQuery = "${it.kennzeichen} - ${it.bezeichnung}" // ➌
+                    },
                     label = "Fahrzeug",
                     labelFor = { "${it.kennzeichen} - ${it.bezeichnung}" }
                 )
@@ -251,8 +283,13 @@ fun FilterScreen() {
             FilterType.MATERIAL -> {
                 FilterableDropdown(
                     items = repo.getAllMaterial(),
+                    text = vm.materialQuery,                            // ➊
+                    onTextChange = { vm.materialQuery = it },           // ➋
                     selected = vm.selectedMaterial,
-                    onSelect = { vm.selectedMaterial = it },
+                    onSelect = {
+                        vm.selectedMaterial = it
+                        vm.materialQuery = it.bezeichnung.toString()   // ➌
+                    },
                     label = "Material",
                     labelFor = { it.bezeichnung.toString() }
                 )
