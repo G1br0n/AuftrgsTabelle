@@ -143,6 +143,22 @@ class AuftragRepository(
                     // 3) Versionsnummer hochsetzen
                     conn.createStatement().execute("PRAGMA user_version = 4;")
                 }
+
+                // Migration auf Version 5: Tabelle für Stundenzettel
+                if (version < 5) {
+                    st.execute("""
+        CREATE TABLE IF NOT EXISTS stundenzettel(
+            id          TEXT PRIMARY KEY,
+            auftrag_id  TEXT NOT NULL,
+            startDatum  TEXT,
+            endDatum    TEXT,
+            pfad        TEXT,
+            FOREIGN KEY(auftrag_id) REFERENCES auftrag(id)
+        );
+    """.trimIndent())
+                    conn.createStatement().execute("PRAGMA user_version = 5;")
+                }
+
             }
         }
     }
@@ -169,6 +185,44 @@ class AuftragRepository(
                 stmt.executeUpdate()
             }
         }
+    }
+
+    fun insertStundenzettel(auftragId: String, z: Stundenzettel) {
+        val sql = """
+        INSERT INTO stundenzettel(id, auftrag_id, startDatum, endDatum, pfad)
+        VALUES(?,?,?,?,?);
+    """.trimIndent()
+        getConnection().use { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.setString(1, z.id)
+                stmt.setString(2, auftragId)
+                stmt.setString(3, z.startDatum?.toString())
+                stmt.setString(4, z.endDatum?.toString())
+                stmt.setString(5, z.pfad)
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    fun getStundenzettelForAuftrag(auftragId: String): List<Stundenzettel> {
+        val list = mutableListOf<Stundenzettel>()
+        getConnection().use { conn ->
+            conn.prepareStatement(
+                "SELECT id, startDatum, endDatum, pfad FROM stundenzettel WHERE auftrag_id = ?"
+            ).use { stmt ->
+                stmt.setString(1, auftragId)
+                val rs = stmt.executeQuery()
+                while (rs.next()) {
+                    list += Stundenzettel(
+                        id         = rs.getString("id"),
+                        startDatum = rs.getString("startDatum")?.let(LocalDateTime::parse),
+                        endDatum   = rs.getString("endDatum")  ?.let(LocalDateTime::parse),
+                        pfad       = rs.getString("pfad")
+                    )
+                }
+            }
+        }
+        return list
     }
 
     fun updatePerson(id: String, p: Person) {
@@ -230,148 +284,150 @@ class AuftragRepository(
         return list
     }
 
-        // Analog: CRUD für Fahrzeug
-        fun insertFahrzeug(f: Fahrzeug) {
-            val sql = "INSERT INTO fahrzeug(id, bezeichnung, kennzeichen, bemerkung) VALUES(?,?,?,?)"
-            getConnection().use { conn ->
-                conn.prepareStatement(sql).use { stmt ->
-                    stmt.setString(1, f.id)
-                    stmt.setString(2, f.bezeichnung)
-                    stmt.setString(3, f.kennzeichen)
-                    stmt.setString(4, f.bemerkung)
-                    stmt.executeUpdate()
+    // Analog: CRUD für Fahrzeug
+    fun insertFahrzeug(f: Fahrzeug) {
+        val sql = "INSERT INTO fahrzeug(id, bezeichnung, kennzeichen, bemerkung) VALUES(?,?,?,?)"
+        getConnection().use { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.setString(1, f.id)
+                stmt.setString(2, f.bezeichnung)
+                stmt.setString(3, f.kennzeichen)
+                stmt.setString(4, f.bemerkung)
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    fun updateFahrzeug(id: String, f: Fahrzeug) {
+        val sql = "UPDATE fahrzeug SET bezeichnung=?, kennzeichen=?, bemerkung=? WHERE id=?"
+        getConnection().use { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.setString(1, f.bezeichnung)
+                stmt.setString(2, f.kennzeichen)
+                stmt.setString(3, f.bemerkung)
+                stmt.setString(4, id)
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    fun deleteFahrzeug(id: String) {
+        getConnection().use { conn ->
+            conn.prepareStatement("DELETE FROM fahrzeug WHERE id=?").use {
+                it.setString(1, id); it.executeUpdate()
+            }
+        }
+    }
+
+    fun getAllFahrzeug(): List<Fahrzeug> {
+        val list = mutableListOf<Fahrzeug>()
+        getConnection().use { conn ->
+            conn.prepareStatement("SELECT * FROM fahrzeug").use { stmt ->
+                val rs = stmt.executeQuery()
+                while (rs.next()) {
+                    list += Fahrzeug(
+                        id = rs.getString("id"),
+                        bezeichnung = rs.getString("bezeichnung"),
+                        kennzeichen = rs.getString("kennzeichen"),
+                        bemerkung = rs.getString("bemerkung")
+                    )
                 }
             }
         }
+        return list
+    }
 
-        fun updateFahrzeug(id: String, f: Fahrzeug) {
-            val sql = "UPDATE fahrzeug SET bezeichnung=?, kennzeichen=?, bemerkung=? WHERE id=?"
-            getConnection().use { conn ->
-                conn.prepareStatement(sql).use { stmt ->
-                    stmt.setString(1, f.bezeichnung)
-                    stmt.setString(2, f.kennzeichen)
-                    stmt.setString(3, f.bemerkung)
-                    stmt.setString(4, id)
-                    stmt.executeUpdate()
+    // CRUD für Material
+    fun insertMaterial(m: Material) {
+        val sql = "INSERT INTO material(id, bezeichnung, bemerkung) VALUES(?,?,?)"
+        getConnection().use { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.setString(1, m.id)
+                stmt.setString(2, m.bezeichnung)
+                stmt.setString(3, m.bemerkung)
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    fun updateMaterial(id: String, m: Material) {
+        val sql = "UPDATE material SET bezeichnung=?, bemerkung=? WHERE id=?"
+        getConnection().use { conn ->
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.setString(1, m.bezeichnung)
+                stmt.setString(2, m.bemerkung)
+                stmt.setString(3, id)
+                stmt.executeUpdate()
+            }
+        }
+    }
+
+    fun deleteMaterial(id: String) {
+        getConnection().use { conn ->
+            conn.prepareStatement("DELETE FROM material WHERE id=?").use {
+                it.setString(1, id); it.executeUpdate()
+            }
+        }
+    }
+
+    fun getAllMaterial(): List<Material> {
+        val list = mutableListOf<Material>()
+        getConnection().use { conn ->
+            conn.prepareStatement("SELECT * FROM material").use { stmt ->
+                val rs = stmt.executeQuery()
+                while (rs.next()) {
+                    list += Material(
+                        id = rs.getString("id"),
+                        bezeichnung = rs.getString("bezeichnung"),
+                        bemerkung = rs.getString("bemerkung")
+                    )
                 }
             }
         }
+        return list
+    }
 
-        fun deleteFahrzeug(id: String) {
-            getConnection().use { conn ->
-                conn.prepareStatement("DELETE FROM fahrzeug WHERE id=?").use {
-                    it.setString(1, id); it.executeUpdate()
-                }
+    // CRUD für Auftrag + Schichten
+    fun insertAuftrag(a: Auftrag) {
+        val sql = """
+        INSERT INTO auftrag(
+            id, sapANummer, startDatum, endDatum,
+            ort, strecke, kmVon, kmBis,
+            massnahme, bemerkung
+        ) VALUES(?,?,?,?,?,?,?,?,?,?)
+    """.trimIndent()
+
+        getConnection().use { conn ->
+            // 1) Auftrag selbst anlegen
+            conn.prepareStatement(sql).use { stmt ->
+                stmt.setString(1, a.id)
+                stmt.setString(2, a.sapANummer)
+                stmt.setString(3, a.startDatum?.toString())
+                stmt.setString(4, a.endDatum?.toString())
+                stmt.setString(5, a.ort)
+                stmt.setString(6, a.strecke)
+                stmt.setString(7, a.kmVon)
+                stmt.setString(8, a.kmBis)
+                stmt.setString(9, a.massnahme)
+                stmt.setString(10, a.bemerkung)
+                stmt.executeUpdate()
+            }
+
+            // 2) Alle Schichten einfügen
+            a.schichten.orEmpty().forEach { schicht ->
+                insertSchicht(conn, a.id, schicht)
+            }
+
+            // 3) Alle Stundenzettel einfügen
+            a.stundenzettel.forEach { zettel ->
+                insertStundenzettel(a.id, zettel)
             }
         }
+    }
 
-        fun getAllFahrzeug(): List<Fahrzeug> {
-            val list = mutableListOf<Fahrzeug>()
-            getConnection().use { conn ->
-                conn.prepareStatement("SELECT * FROM fahrzeug").use { stmt ->
-                    val rs = stmt.executeQuery()
-                    while (rs.next()) {
-                        list += Fahrzeug(
-                            id = rs.getString("id"),
-                            bezeichnung = rs.getString("bezeichnung"),
-                            kennzeichen = rs.getString("kennzeichen"),
-                            bemerkung = rs.getString("bemerkung")
-                        )
-                    }
-                }
-            }
-            return list
-        }
 
-        // CRUD für Material
-        fun insertMaterial(m: Material) {
-            val sql = "INSERT INTO material(id, bezeichnung, bemerkung) VALUES(?,?,?)"
-            getConnection().use { conn ->
-                conn.prepareStatement(sql).use { stmt ->
-                    stmt.setString(1, m.id)
-                    stmt.setString(2, m.bezeichnung)
-                    stmt.setString(3, m.bemerkung)
-                    stmt.executeUpdate()
-                }
-            }
-        }
-
-        fun updateMaterial(id: String, m: Material) {
-            val sql = "UPDATE material SET bezeichnung=?, bemerkung=? WHERE id=?"
-            getConnection().use { conn ->
-                conn.prepareStatement(sql).use { stmt ->
-                    stmt.setString(1, m.bezeichnung)
-                    stmt.setString(2, m.bemerkung)
-                    stmt.setString(3, id)
-                    stmt.executeUpdate()
-                }
-            }
-        }
-
-        fun deleteMaterial(id: String) {
-            getConnection().use { conn ->
-                conn.prepareStatement("DELETE FROM material WHERE id=?").use {
-                    it.setString(1, id); it.executeUpdate()
-                }
-            }
-        }
-
-        fun getAllMaterial(): List<Material> {
-            val list = mutableListOf<Material>()
-            getConnection().use { conn ->
-                conn.prepareStatement("SELECT * FROM material").use { stmt ->
-                    val rs = stmt.executeQuery()
-                    while (rs.next()) {
-                        list += Material(
-                            id = rs.getString("id"),
-                            bezeichnung = rs.getString("bezeichnung"),
-                            bemerkung = rs.getString("bemerkung")
-                        )
-                    }
-                }
-            }
-            return list
-        }
-
-        // CRUD für Auftrag + Schichten
-        fun insertAuftrag(a: Auftrag) {
-            val sql = """
-         INSERT INTO auftrag(
-             id, sapANummer, startDatum, endDatum,
-             ort, strecke, kmVon, kmBis,
-             massnahme, bemerkung
-         ) VALUES(?,?,?,?,?,?,?,?,?,?)
-     """.trimIndent()
-            getConnection().use { conn ->
-
-                            conn.prepareStatement(sql).use { stmt ->
-                        stmt.setString(1, a.id)
-                        stmt.setString(2, a.sapANummer)
-                        stmt.setString(3, a.startDatum?.toString())
-                        stmt.setString(4, a.endDatum?.toString())
-                        stmt.setString(5, a.ort)
-                        stmt.setString(6, a.strecke)
-                        stmt.setString(7, a.kmVon)
-                        stmt.setString(8, a.kmBis)
-                        stmt.setString(9, a.massnahme)
-                        stmt.setString(10, a.bemerkung)
-                        stmt.executeUpdate()
-                                   // >>> DEBUG: prüfen, was wirklich in der DB gelandet ist
-                                    conn.prepareStatement("SELECT startDatum FROM auftrag WHERE id = ?").use { check ->
-                                            check.setString(1, a.id)
-                                            check.executeQuery().use { rs ->
-                                                    if (rs.next()) {
-                                                            println("DEBUG insertAuftrag: startDatum in DB = '${rs.getString("startDatum")}'")
-                                                       }
-                                                }
-                                        }
-                    }
-                    a.schichten?.forEach { schicht -> insertSchicht(conn, a.id, schicht) }
-                }
-            }
-
-        private fun insertSchicht(conn: Connection, auftragId: String, s: Schicht) {
-            val sql = """
+    private fun insertSchicht(conn: Connection, auftragId: String, s: Schicht) {
+        val sql = """
         INSERT INTO schicht(
             id, auftrag_id, startDatum, endDatum,
             ort, strecke, kmVon, kmBis,
@@ -380,220 +436,232 @@ class AuftragRepository(
         ) VALUES(?,?,?,?,?,?,?,?,?,?,?)
     """.trimIndent()
 
-            // 1) Schicht selbst einfügen
+        // 1) Schicht selbst einfügen
+        conn.prepareStatement(sql).use { stmt ->
+            stmt.setString(1, s.id)
+            stmt.setString(2, auftragId)
+            stmt.setString(3, s.startDatum?.toString())
+            stmt.setString(4, s.endDatum?.toString())
+            stmt.setString(5, s.ort)
+            stmt.setString(6, s.strecke)
+            stmt.setString(7, s.kmVon)
+            stmt.setString(8, s.kmBis)
+            stmt.setString(9, s.massnahme)
+            stmt.setString(10, s.bemerkung)
+            stmt.setInt(11, s.pausenZeit)
+            stmt.executeUpdate()
+        }
+
+        // 2) Mitarbeiter-Zuordnung
+        s.mitarbeiter.orEmpty().forEach { p ->
+            conn.prepareStatement(
+                "INSERT OR IGNORE INTO schicht_person(schicht_id, person_id) VALUES(?,?)"
+            ).use {
+                it.setString(1, s.id)
+                it.setString(2, p.id)
+                it.executeUpdate()
+            }
+        }
+
+        // 3) Fahrzeug-Zuordnung
+        s.fahrzeug.orEmpty().forEach { f ->
+            conn.prepareStatement(
+                "INSERT OR IGNORE INTO schicht_fahrzeug(schicht_id, fahrzeug_id) VALUES(?,?)"
+            ).use {
+                it.setString(1, s.id)
+                it.setString(2, f.id)
+                it.executeUpdate()
+            }
+        }
+
+        // 4) Material-Zuordnung
+        s.material.orEmpty().forEach { m ->
+            conn.prepareStatement(
+                "INSERT OR IGNORE INTO schicht_material(schicht_id, material_id) VALUES(?,?)"
+            ).use {
+                it.setString(1, s.id)
+                it.setString(2, m.id)
+                it.executeUpdate()
+            }
+        }
+    }
+
+
+
+    fun updateAuftrag(a: Auftrag) {
+        val sql = """
+        UPDATE auftrag SET
+            sapANummer = ?, startDatum = ?, endDatum = ?,
+            ort        = ?, strecke    = ?, kmVon     = ?,
+            kmBis      = ?, massnahme  = ?, bemerkung = ?
+        WHERE id = ?
+    """.trimIndent()
+
+        getConnection().use { conn ->
             conn.prepareStatement(sql).use { stmt ->
-                stmt.setString(1, s.id)
-                stmt.setString(2, auftragId)
-                stmt.setString(3, s.startDatum?.toString())
-                stmt.setString(4, s.endDatum?.toString())
-                stmt.setString(5, s.ort)
-                stmt.setString(6, s.strecke)
-                stmt.setString(7, s.kmVon)
-                stmt.setString(8, s.kmBis)
-                stmt.setString(9, s.massnahme)
-                stmt.setString(10, s.bemerkung)
-                stmt.setInt(11, s.pausenZeit)
+                stmt.setString(1, a.sapANummer)
+                stmt.setString(2, a.startDatum?.toString())
+                stmt.setString(3, a.endDatum?.toString())
+                stmt.setString(4, a.ort)
+                stmt.setString(5, a.strecke)
+                stmt.setString(6, a.kmVon)
+                stmt.setString(7, a.kmBis)
+                stmt.setString(8, a.massnahme)
+                stmt.setString(9, a.bemerkung)
+                stmt.setString(10, a.id)
                 stmt.executeUpdate()
             }
 
-            // 2) Mitarbeiter-Zuordnung
-            s.mitarbeiter.orEmpty().forEach { p ->
-                conn.prepareStatement(
-                    "INSERT OR IGNORE INTO schicht_person(schicht_id, person_id) VALUES(?,?)"
-                ).use {
-                    it.setString(1, s.id)
-                    it.setString(2, p.id)
-                    it.executeUpdate()
-                }
-            }
+            // Alte Schichten entfernen
+            deleteSchichtenByAuftrag(conn, a.id)
+            // Alte Stundenzettel entfernen
+            deleteStundenzettelByAuftrag(conn, a.id)
 
-            // 3) Fahrzeug-Zuordnung
-            s.fahrzeug.orEmpty().forEach { f ->
-                conn.prepareStatement(
-                    "INSERT OR IGNORE INTO schicht_fahrzeug(schicht_id, fahrzeug_id) VALUES(?,?)"
-                ).use {
-                    it.setString(1, s.id)
-                    it.setString(2, f.id)
-                    it.executeUpdate()
-                }
+            // Neue Schichten einfügen
+            a.schichten.orEmpty().forEach { schicht ->
+                insertSchicht(conn, a.id, schicht)
             }
-
-            // 4) Material-Zuordnung
-            s.material.orEmpty().forEach { m ->
-                conn.prepareStatement(
-                    "INSERT OR IGNORE INTO schicht_material(schicht_id, material_id) VALUES(?,?)"
-                ).use {
-                    it.setString(1, s.id)
-                    it.setString(2, m.id)
-                    it.executeUpdate()
-                }
+            // Neue Stundenzettel einfügen
+            a.stundenzettel.forEach { zettel ->
+                insertStundenzettel(a.id, zettel)
             }
         }
+    }
 
 
 
-        fun updateAuftrag(a: Auftrag) {
-            val sql = """
-        UPDATE auftrag SET
-            sapANummer=?, startDatum=?, endDatum=?,
-            ort=?, strecke=?, kmVon=?, kmBis=?,
-            massnahme=?, bemerkung=?
-        WHERE id=?
-    """.trimIndent()
-            getConnection().use { conn ->
-                conn.prepareStatement(sql).use { stmt ->
-                    stmt.setString(1, a.sapANummer)
-                    stmt.setString(2, a.startDatum?.toString())
-                    stmt.setString(3, a.endDatum?.toString())
-                    stmt.setString(4, a.ort)
-                    stmt.setString(5, a.strecke)
-                    stmt.setString(6, a.kmVon)
-                    stmt.setString(7, a.kmBis)
-                    stmt.setString(8, a.massnahme)
-                    stmt.setString(9, a.bemerkung)
-                    stmt.setString(10, a.id)
-                    // Update ausführen
-                    stmt.executeUpdate()
-
-                    // >>> DEBUG: prüfen, ob das Datum korrekt in der DB gelandet ist
-                    conn.prepareStatement("SELECT startDatum FROM auftrag WHERE id = ?").use { check ->
-                        check.setString(1, a.id)
-                        check.executeQuery().use { rs ->
-                            if (rs.next()) {
-                                println("DEBUG updateAuftrag: startDatum in DB = '${rs.getString("startDatum")}'")
-                            } else {
-                                println("DEBUG updateAuftrag: kein Auftrag mit id=${a.id} gefunden!")
-                            }
-                        }
-                    }
-                }
-
-                // Alte Schichten löschen
-                deleteSchichtenByAuftrag(conn, a.id)
-                // Neue Schichten einfügen
-                a.schichten?.forEach { insertSchicht(conn, a.id, it) }
+    fun deleteAuftrag(id: String) {
+        getConnection().use { conn ->
+            // Schichten und ihre Relationen
+            deleteSchichtenByAuftrag(conn, id)
+            // Stundenzettel
+            deleteStundenzettelByAuftrag(conn, id)
+            // dann den Auftrag selbst
+            conn.prepareStatement("DELETE FROM auftrag WHERE id=?").use {
+                it.setString(1, id)
+                it.executeUpdate()
             }
         }
+    }
 
 
-        fun deleteAuftrag(id: String) {
-            getConnection().use { conn ->
-                deleteSchichtenByAuftrag(conn, id)
-                conn.prepareStatement("DELETE FROM auftrag WHERE id=?").use {
-                    it.setString(1, id); it.executeUpdate()
-                }
-            }
+    private fun deleteSchichtenByAuftrag(conn: Connection, auftragId: String) {
+        // Fremdschlüssel-Tabellen leeren
+        conn.prepareStatement("DELETE FROM schicht_person WHERE schicht_id IN (SELECT id FROM schicht WHERE auftrag_id=?)").use {
+            it.setString(1, auftragId); it.executeUpdate()
         }
-
-        private fun deleteSchichtenByAuftrag(conn: Connection, auftragId: String) {
-            // Fremdschlüssel-Tabellen leeren
-            conn.prepareStatement("DELETE FROM schicht_person WHERE schicht_id IN (SELECT id FROM schicht WHERE auftrag_id=?)").use {
-                it.setString(1, auftragId); it.executeUpdate()
-            }
-            conn.prepareStatement("DELETE FROM schicht_fahrzeug WHERE schicht_id IN (SELECT id FROM schicht WHERE auftrag_id=?)").use {
-                it.setString(1, auftragId); it.executeUpdate()
-            }
-            conn.prepareStatement("DELETE FROM schicht_material WHERE schicht_id IN (SELECT id FROM schicht WHERE auftrag_id=?)").use {
-                it.setString(1, auftragId); it.executeUpdate()
-            }
-            conn.prepareStatement("DELETE FROM schicht WHERE auftrag_id=?").use {
-                it.setString(1, auftragId); it.executeUpdate()
-            }
+        conn.prepareStatement("DELETE FROM schicht_fahrzeug WHERE schicht_id IN (SELECT id FROM schicht WHERE auftrag_id=?)").use {
+            it.setString(1, auftragId); it.executeUpdate()
         }
+        conn.prepareStatement("DELETE FROM schicht_material WHERE schicht_id IN (SELECT id FROM schicht WHERE auftrag_id=?)").use {
+            it.setString(1, auftragId); it.executeUpdate()
+        }
+        conn.prepareStatement("DELETE FROM schicht WHERE auftrag_id=?").use {
+            it.setString(1, auftragId); it.executeUpdate()
+        }
+    }
 
-        fun updateSchicht(schichtId: String, s: Schicht) {
-            getConnection().use { conn ->
-                conn.prepareStatement(
-                    """
+    fun updateSchicht(schichtId: String, s: Schicht) {
+        getConnection().use { conn ->
+            conn.prepareStatement(
+                """
             UPDATE schicht SET
                 startDatum  = ?, endDatum  = ?, ort = ?, strecke = ?,
                 kmVon       = ?, kmBis    = ?, massnahme = ?, bemerkung = ?,
                 pausenZeit  = ?                 -- 🆕  hier ergänzen
             WHERE id = ?
             """.trimIndent()
-                ).use { stmt ->
-                    stmt.setString(1,  s.startDatum?.toString())
-                    stmt.setString(2,  s.endDatum?.toString())
-                    stmt.setString(3,  s.ort)
-                    stmt.setString(4,  s.strecke)
-                    stmt.setString(5,  s.kmVon)
-                    stmt.setString(6,  s.kmBis)
-                    stmt.setString(7,  s.massnahme)
-                    stmt.setString(8,  s.bemerkung)
-                    stmt.setInt   (9,  s.pausenZeit)      // 🆕  Pause in Minuten
-                    stmt.setString(10, schichtId)         // Index um +1 verschoben
-                    stmt.executeUpdate()
-                }
-                // alte Verknüpfungen löschen
-                conn.prepareStatement("DELETE FROM schicht_person WHERE schicht_id=?").use { it.setString(1, schichtId); it.executeUpdate() }
-                conn.prepareStatement("DELETE FROM schicht_fahrzeug WHERE schicht_id=?").use { it.setString(1, schichtId); it.executeUpdate() }
-                conn.prepareStatement("DELETE FROM schicht_material WHERE schicht_id=?").use { it.setString(1, schichtId); it.executeUpdate() }
-                // neue Verknüpfungen
-                s.mitarbeiter?.forEach { rel ->
-                    conn.prepareStatement("INSERT OR IGNORE INTO schicht_person(schicht_id, person_id) VALUES(?,?)").use {
-                        it.setString(1, schichtId); it.setString(2, rel.id); it.executeUpdate()
-                    }
-                }
-                s.fahrzeug?.forEach { rel ->
-                    conn.prepareStatement("INSERT OR IGNORE INTO schicht_fahrzeug(schicht_id, fahrzeug_id) VALUES(?,?)").use {
-                        it.setString(1, schichtId); it.setString(2, rel.id); it.executeUpdate()
-                    }
-                }
-                s.material?.forEach { rel ->
-                    conn.prepareStatement("INSERT OR IGNORE INTO schicht_material(schicht_id, material_id) VALUES(?,?)").use {
-                        it.setString(1, schichtId); it.setString(2, rel.id); it.executeUpdate()
-                    }
+            ).use { stmt ->
+                stmt.setString(1,  s.startDatum?.toString())
+                stmt.setString(2,  s.endDatum?.toString())
+                stmt.setString(3,  s.ort)
+                stmt.setString(4,  s.strecke)
+                stmt.setString(5,  s.kmVon)
+                stmt.setString(6,  s.kmBis)
+                stmt.setString(7,  s.massnahme)
+                stmt.setString(8,  s.bemerkung)
+                stmt.setInt   (9,  s.pausenZeit)      // 🆕  Pause in Minuten
+                stmt.setString(10, schichtId)         // Index um +1 verschoben
+                stmt.executeUpdate()
+            }
+            // alte Verknüpfungen löschen
+            conn.prepareStatement("DELETE FROM schicht_person WHERE schicht_id=?").use { it.setString(1, schichtId); it.executeUpdate() }
+            conn.prepareStatement("DELETE FROM schicht_fahrzeug WHERE schicht_id=?").use { it.setString(1, schichtId); it.executeUpdate() }
+            conn.prepareStatement("DELETE FROM schicht_material WHERE schicht_id=?").use { it.setString(1, schichtId); it.executeUpdate() }
+            // neue Verknüpfungen
+            s.mitarbeiter?.forEach { rel ->
+                conn.prepareStatement("INSERT OR IGNORE INTO schicht_person(schicht_id, person_id) VALUES(?,?)").use {
+                    it.setString(1, schichtId); it.setString(2, rel.id); it.executeUpdate()
                 }
             }
-        }
-
-        fun deleteSchicht(id: String) {
-            getConnection().use { conn ->
-                conn.prepareStatement("DELETE FROM schicht_person WHERE schicht_id=?").use { it.setString(1, id); it.executeUpdate() }
-                conn.prepareStatement("DELETE FROM schicht_fahrzeug WHERE schicht_id=?").use { it.setString(1, id); it.executeUpdate() }
-                conn.prepareStatement("DELETE FROM schicht_material WHERE schicht_id=?").use { it.setString(1, id); it.executeUpdate() }
-                conn.prepareStatement("DELETE FROM schicht WHERE id=?").use { it.setString(1, id); it.executeUpdate() }
-            }
-        }
-
-        // ruft alle Aufträge mit zugehörigen Schichten aus der DB
-        fun getAllAuftraege(): List<Auftrag> {
-            val list = mutableListOf<Auftrag>()
-            getConnection().use { conn ->
-                conn.prepareStatement("SELECT * FROM auftrag").use { stmt ->
-                    val rs = stmt.executeQuery()
-                    while (rs.next()) {
-                        val id = rs.getString("id")
-                        val sap = rs.getString("sapANummer")
-                        val start = rs.getString("startDatum")?.let { LocalDateTime.parse(it) }
-                        val end = rs.getString("endDatum")?.let { LocalDateTime.parse(it) }
-                        val ort = rs.getString("ort")
-                        val strecke = rs.getString("strecke")
-                        val kmVon = rs.getString("kmVon")
-                        val kmBis = rs.getString("kmBis")
-                        val massnahme = rs.getString("massnahme")
-                        val bemerkung = rs.getString("bemerkung")
-                        // hole alle Schichten zu diesem Auftrag
-                        val schichten = conn.getSchichtenForAuftrag(id)
-                        list += Auftrag(
-                            id        = id,
-                            sapANummer= sap,
-                            startDatum= start,
-                            endDatum  = end,
-                            ort       = ort,
-                            strecke   = strecke,
-                            kmVon     = kmVon,
-                            kmBis     = kmBis,
-                            massnahme = massnahme,
-                            bemerkung = bemerkung,
-                            schichten = schichten
-                        )
-                    }
+            s.fahrzeug?.forEach { rel ->
+                conn.prepareStatement("INSERT OR IGNORE INTO schicht_fahrzeug(schicht_id, fahrzeug_id) VALUES(?,?)").use {
+                    it.setString(1, schichtId); it.setString(2, rel.id); it.executeUpdate()
                 }
             }
-            return list
+            s.material?.forEach { rel ->
+                conn.prepareStatement("INSERT OR IGNORE INTO schicht_material(schicht_id, material_id) VALUES(?,?)").use {
+                    it.setString(1, schichtId); it.setString(2, rel.id); it.executeUpdate()
+                }
+            }
         }
     }
+    private fun deleteStundenzettelByAuftrag(conn: Connection, auftragId: String) {
+        conn.prepareStatement(
+            "DELETE FROM stundenzettel WHERE auftrag_id = ?"
+        ).use {
+            it.setString(1, auftragId)
+            it.executeUpdate()
+        }
+    }
+
+    fun deleteSchicht(id: String) {
+        getConnection().use { conn ->
+            conn.prepareStatement("DELETE FROM schicht_person WHERE schicht_id=?").use { it.setString(1, id); it.executeUpdate() }
+            conn.prepareStatement("DELETE FROM schicht_fahrzeug WHERE schicht_id=?").use { it.setString(1, id); it.executeUpdate() }
+            conn.prepareStatement("DELETE FROM schicht_material WHERE schicht_id=?").use { it.setString(1, id); it.executeUpdate() }
+            conn.prepareStatement("DELETE FROM schicht WHERE id=?").use { it.setString(1, id); it.executeUpdate() }
+        }
+    }
+
+    // ruft alle Aufträge mit zugehörigen Schichten aus der DB
+    fun getAllAuftraege(): List<Auftrag> {
+        val list = mutableListOf<Auftrag>()
+        getConnection().use { conn ->
+            conn.prepareStatement("SELECT * FROM auftrag").use { stmt ->
+                val rs = stmt.executeQuery()
+                while (rs.next()) {
+                    val id = rs.getString("id")
+                    val sap = rs.getString("sapANummer")
+                    val start = rs.getString("startDatum")?.let { LocalDateTime.parse(it) }
+                    val end = rs.getString("endDatum")?.let { LocalDateTime.parse(it) }
+                    val ort = rs.getString("ort")
+                    val strecke = rs.getString("strecke")
+                    val kmVon = rs.getString("kmVon")
+                    val kmBis = rs.getString("kmBis")
+                    val massnahme = rs.getString("massnahme")
+                    val bemerkung = rs.getString("bemerkung")
+                    // hole alle Schichten zu diesem Auftrag
+                    val schichten = conn.getSchichtenForAuftrag(id)
+                    list += Auftrag(
+                        id        = id,
+                        sapANummer= sap,
+                        startDatum= start,
+                        endDatum  = end,
+                        ort       = ort,
+                        strecke   = strecke,
+                        kmVon     = kmVon,
+                        kmBis     = kmBis,
+                        massnahme = massnahme,
+                        bemerkung = bemerkung,
+                        schichten = schichten
+                    )
+                }
+            }
+        }
+        return list
+    }
+}
 
 private fun Connection.getPersons(schichtId: String): List<Person> =
     prepareStatement("""
@@ -624,78 +692,78 @@ private fun Connection.getPersons(schichtId: String): List<Person> =
 
 
 private fun Connection.getFahrzeuge(schichtId: String): List<Fahrzeug> =
-        prepareStatement("""
+    prepareStatement("""
                 SELECT f.* FROM fahrzeug f
                 JOIN schicht_fahrzeug sf ON sf.fahrzeug_id = f.id
                 WHERE sf.schicht_id = ?
             """).use { st ->
-            st.setString(1, schichtId)
-            st.executeQuery().let { rs ->
-                buildList {
-                    while (rs.next()) add(
-                        Fahrzeug(
-                            id          = rs.getString("id"),
-                            bezeichnung = rs.getString("bezeichnung"),
-                            kennzeichen = rs.getString("kennzeichen"),
-                            bemerkung   = rs.getString("bemerkung")
-                        )
+        st.setString(1, schichtId)
+        st.executeQuery().let { rs ->
+            buildList {
+                while (rs.next()) add(
+                    Fahrzeug(
+                        id          = rs.getString("id"),
+                        bezeichnung = rs.getString("bezeichnung"),
+                        kennzeichen = rs.getString("kennzeichen"),
+                        bemerkung   = rs.getString("bemerkung")
                     )
-                }
+                )
             }
         }
+    }
 
-     private fun Connection.getMaterial(schichtId: String): List<Material> =
-        prepareStatement("""
+private fun Connection.getMaterial(schichtId: String): List<Material> =
+    prepareStatement("""
                 SELECT m.* FROM material m
                 JOIN schicht_material sm ON sm.material_id = m.id
                 WHERE sm.schicht_id = ?
             """).use { st ->
-            st.setString(1, schichtId)
-            st.executeQuery().let { rs ->
-                buildList {
-                    while (rs.next()) add(
-                        Material(
-                            id          = rs.getString("id"),
-                            bezeichnung = rs.getString("bezeichnung"),
-                            bemerkung   = rs.getString("bemerkung")
-                        )
+        st.setString(1, schichtId)
+        st.executeQuery().let { rs ->
+            buildList {
+                while (rs.next()) add(
+                    Material(
+                        id          = rs.getString("id"),
+                        bezeichnung = rs.getString("bezeichnung"),
+                        bemerkung   = rs.getString("bemerkung")
                     )
-                }
+                )
             }
         }
+    }
 
-    /**  Lädt alle Schichten inkl. Relationen zu genau einem Auftrag  */
-    private fun Connection.getSchichtenForAuftrag(auftragId: String): List<Schicht> =
-        buildList {
-            prepareStatement("SELECT * FROM schicht WHERE auftrag_id = ?").use { st ->
-                st.setString(1, auftragId)
-                val rs = st.executeQuery()
-                while (rs.next()) {
+/**  Lädt alle Schichten inkl. Relationen zu genau einem Auftrag  */
+private fun Connection.getSchichtenForAuftrag(auftragId: String): List<Schicht> =
+    buildList {
+        prepareStatement("SELECT * FROM schicht WHERE auftrag_id = ?").use { st ->
+            st.setString(1, auftragId)
+            val rs = st.executeQuery()
+            while (rs.next()) {
 
-                    /* 🆕  Pause auslesen */
-                    val pause = rs.getInt("pausenZeit")
+                /* 🆕  Pause auslesen */
+                val pause = rs.getInt("pausenZeit")
 
-                    val schichtId = rs.getString("id")
-                    add(
-                        Schicht(
-                            id          = schichtId,
-                            startDatum  = rs.getString("startDatum")?.let(LocalDateTime::parse),
-                            endDatum    = rs.getString("endDatum")  ?.let(LocalDateTime::parse),
-                            ort         = rs.getString("ort"),
-                            strecke     = rs.getString("strecke"),
-                            kmVon       = rs.getString("kmVon"),
-                            kmBis       = rs.getString("kmBis"),
-                            massnahme   = rs.getString("massnahme"),
-                            bemerkung   = rs.getString("bemerkung"),
+                val schichtId = rs.getString("id")
+                add(
+                    Schicht(
+                        id          = schichtId,
+                        startDatum  = rs.getString("startDatum")?.let(LocalDateTime::parse),
+                        endDatum    = rs.getString("endDatum")  ?.let(LocalDateTime::parse),
+                        ort         = rs.getString("ort"),
+                        strecke     = rs.getString("strecke"),
+                        kmVon       = rs.getString("kmVon"),
+                        kmBis       = rs.getString("kmBis"),
+                        massnahme   = rs.getString("massnahme"),
+                        bemerkung   = rs.getString("bemerkung"),
 
-                            /* 🆕  hier einsetzen */
-                            pausenZeit  = pause,
+                        /* 🆕  hier einsetzen */
+                        pausenZeit  = pause,
 
-                            mitarbeiter = getPersons(schichtId),
-                            fahrzeug    = getFahrzeuge(schichtId),
-                            material    = getMaterial(schichtId)
-                        )
+                        mitarbeiter = getPersons(schichtId),
+                        fahrzeug    = getFahrzeuge(schichtId),
+                        material    = getMaterial(schichtId)
                     )
-                }
+                )
             }
         }
+    }

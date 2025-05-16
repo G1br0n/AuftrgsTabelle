@@ -1,12 +1,15 @@
 package viewModel
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import elemente.ScannerUtil
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import models.*
 import repository.AuftragRepository
 import view.WiederholungsModus
 import view.generiereSchichten
+import java.io.File
 // ✔ richtiger Import
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -23,7 +26,8 @@ class AuftraegeViewModel(
     private val repository: AuftragRepository = AuftragRepository()
 ) {
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())    // <— hier
 
 
     /* ---------------------------------------------------- intern+Flows */
@@ -227,6 +231,37 @@ class AuftraegeViewModel(
         loadAuftraege()
     }
 
+
+    fun scanStundenzettel(auftrag: Auftrag) = scope.launch {
+        // Ordner anlegen
+        val scanDir = File("scans").apply { mkdirs() }
+        // Dateiname: SAP + Datumsspanne
+        val df       = DateTimeFormatter.ofPattern("yyyyMMdd")
+        val start    = auftrag.schichten.minOf { it.startDatum!! }.format(df)
+        val end      = auftrag.schichten.maxOf { it.endDatum!!   }.format(df)
+        val filename = "${auftrag.sapANummer ?: auftrag.id}_$start-$end.pdf"
+        val outPdf   = File(scanDir, filename)
+        // Scannen + PDF
+        val tempPng  = File.createTempFile("scan_", ".png")
+        if (ScannerUtil.scanToPng(tempPng)) {
+            ScannerUtil.pngToPdf(tempPng, outPdf)
+            tempPng.delete()
+            // In DB speichern
+            repository.insertStundenzettel(
+                auftrag.id,
+                Stundenzettel(
+                    startDatum = auftrag.schichten.minOf { it.startDatum!! },
+                    endDatum   = auftrag.schichten.maxOf { it.endDatum!!   },
+                    pfad       = outPdf.absolutePath
+                )
+            )
+            // Option: die UI neu laden lassen
+            loadAuftraege()
+        } else {
+            // Fehlerbehandlung nach Bedarf
+            println("Scan fehlgeschlagen für Auftrag ${auftrag.id}")
+        }
+    }
     /* ------------------------------------------- private Hilfs‑Utilities */
 
     /**

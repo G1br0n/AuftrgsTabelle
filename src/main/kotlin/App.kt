@@ -9,6 +9,7 @@
         import androidx.compose.material.*
         import androidx.compose.material.icons.Icons
         import androidx.compose.material.icons.filled.*
+        import androidx.compose.material3.ExperimentalMaterial3Api
 
         import androidx.compose.runtime.*
         import androidx.compose.ui.Alignment
@@ -108,6 +109,7 @@
             }
         }
 
+        @OptIn(ExperimentalMaterial3Api::class)
         @Composable
         private fun ContentArea(screen: Screen, modifier: Modifier) {
             Box(modifier.fillMaxSize().padding(12.dp)) {
@@ -184,14 +186,23 @@
             val end = now.plusMonths(2)
 
             val filteredAuftraege = remember(allAuftraege, scale) {
-                allAuftraege.map { auftrag ->
-                    auftrag.copy(
-                        schichten = auftrag.schichten?.filter {
-                            it.startDatum?.isBefore(end) == true && it.endDatum?.isAfter(start) == true
+                allAuftraege
+                    .map { auftrag ->
+                        // erst schichten filtern
+                        val filteredSchichten = auftrag.schichten.filter {
+                            it.startDatum?.isBefore(end) == true &&
+                                    it.endDatum  ?.isAfter (start) == true
                         }
-                    )
-                }.filter { it.schichten?.isNotEmpty() == true }
+                        // und eine Kopie anlegen, bei der sowohl schichten als auch stundenzettel korrekt mitgegeben werden
+                        auftrag.copy(
+                            schichten     = filteredSchichten,
+                            stundenzettel = auftrag.stundenzettel
+                        )
+                    }
+                    // nur Aufträge mit mindestens einer Schicht übriglassen
+                    .filter { it.schichten.isNotEmpty() }
             }
+
 
             Column(modifier) {
                 Row(verticalAlignment = Alignment.CenterVertically) {

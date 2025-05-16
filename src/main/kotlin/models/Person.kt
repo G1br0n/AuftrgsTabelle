@@ -18,7 +18,8 @@
 
             val massnahme: String?,
             val bemerkung: String?,
-            val schichten: List<Schicht>?
+            val schichten:     List<Schicht>       = emptyList(),
+            val stundenzettel: List<Stundenzettel> = emptyList()
         )
 
         // models/Schicht.kt
@@ -64,4 +65,12 @@
             val id: String = UUID.randomUUID().toString(),
             val bezeichnung: String?,
             val bemerkung: String?
+        )
+
+        data class Stundenzettel(
+            val id: String = UUID.randomUUID().toString(),
+            val startDatum: LocalDateTime?,
+            val endDatum: LocalDateTime?,
+            val pfad: String?
+
         )
