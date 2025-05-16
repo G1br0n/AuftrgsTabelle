@@ -108,7 +108,41 @@ class AuftragRepository(
                     conn.createStatement().execute("PRAGMA user_version = 2;")
                 }
 
-                // Weitere Migrationen bei version < 3,4... hier hinzufügen
+                // Migration auf Version 3: Soft-Delete-Flag in person
+                if (version < 3) {
+                    st.execute("ALTER TABLE person ADD COLUMN is_deleted INTEGER DEFAULT 0;")
+                    conn.createStatement().execute("PRAGMA user_version = 3;")
+                }
+                if (version < 4) {
+                    // 1) Archiv-Tabelle anlegen
+                    st.execute("""
+        CREATE TABLE IF NOT EXISTS person_archive (
+            id TEXT PRIMARY KEY,
+            vorname TEXT,
+            name TEXT,
+            firma TEXT,
+            bemerkung TEXT,
+            position INTEGER DEFAULT 0,
+            is_deleted INTEGER DEFAULT 1
+        );
+    """.trimIndent())
+
+                    // 2) Trigger, der vor jedem DELETE aus person die Zeile in person_archive kopiert
+                    st.execute("""
+        CREATE TRIGGER IF NOT EXISTS trg_person_archive
+        BEFORE DELETE ON person
+        FOR EACH ROW
+        BEGIN
+            INSERT OR REPLACE INTO person_archive
+            (id, vorname, name, firma, bemerkung, position, is_deleted)
+            VALUES
+            (OLD.id, OLD.vorname, OLD.name, OLD.firma, OLD.bemerkung, OLD.position, 1);
+        END;
+    """.trimIndent())
+
+                    // 3) Versionsnummer hochsetzen
+                    conn.createStatement().execute("PRAGMA user_version = 4;")
+                }
             }
         }
     }
@@ -164,7 +198,7 @@ class AuftragRepository(
 
     fun deletePerson(id: String) {
         getConnection().use { conn ->
-            conn.prepareStatement("DELETE FROM person WHERE id=?").use {
+            conn.prepareStatement("UPDATE person SET is_deleted = 1 WHERE id = ?").use {
                 it.setString(1, id); it.executeUpdate()
             }
         }
@@ -173,8 +207,12 @@ class AuftragRepository(
     fun getAllPerson(): List<Person> {
         val list = mutableListOf<Person>()
         getConnection().use { conn ->
-            conn.prepareStatement(
-                "SELECT id, vorname, name, firma, bemerkung, COALESCE(position,0) AS position FROM person ORDER BY position ASC"
+            conn.prepareStatement("""
+                SELECT id, vorname, name, firma, bemerkung, COALESCE(position,0) AS position
+                FROM person
+                WHERE is_deleted = 0
+                ORDER BY position ASC
+                """.trimIndent()
             ).use { stmt ->
                 val rs = stmt.executeQuery()
                 while (rs.next()) {
@@ -557,29 +595,35 @@ class AuftragRepository(
         }
     }
 
-    private fun Connection.getPersons(schichtId: String): List<Person> =
-        prepareStatement("""
-                SELECT p.* FROM person p
-                JOIN schicht_person sp ON sp.person_id = p.id
-                WHERE sp.schicht_id = ?
-            """).use { st ->
-            st.setString(1, schichtId)
-            st.executeQuery().let { rs ->
-                buildList {
-                    while (rs.next()) add(
-                        Person(
-                            id       = rs.getString("id"),
-                            vorname  = rs.getString("vorname"),
-                            name     = rs.getString("name"),
-                            firma    = rs.getString("firma"),
-                            bemerkung= rs.getString("bemerkung")
-                        )
+private fun Connection.getPersons(schichtId: String): List<Person> =
+    prepareStatement("""
+        SELECT * FROM person p
+        JOIN schicht_person sp ON sp.person_id = p.id
+        WHERE sp.schicht_id = ?
+        UNION ALL
+        SELECT * FROM person_archive pa
+        JOIN schicht_person sp2 ON sp2.person_id = pa.id
+        WHERE sp2.schicht_id = ?;
+    """.trimIndent()).use { st ->
+        st.setString(1, schichtId)
+        st.setString(2, schichtId)
+        st.executeQuery().let { rs ->
+            buildList {
+                while (rs.next()) add(
+                    Person(
+                        id        = rs.getString("id"),
+                        vorname   = rs.getString("vorname"),
+                        name      = rs.getString("name"),
+                        firma     = rs.getString("firma"),
+                        bemerkung = rs.getString("bemerkung")
                     )
-                }
+                )
             }
         }
+    }
 
-    private fun Connection.getFahrzeuge(schichtId: String): List<Fahrzeug> =
+
+private fun Connection.getFahrzeuge(schichtId: String): List<Fahrzeug> =
         prepareStatement("""
                 SELECT f.* FROM fahrzeug f
                 JOIN schicht_fahrzeug sf ON sf.fahrzeug_id = f.id
