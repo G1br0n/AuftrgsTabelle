@@ -2,9 +2,7 @@
         package view
 
         import androidx.compose.animation.animateContentSize
-        import androidx.compose.foundation.BorderStroke
-        import androidx.compose.foundation.background
-        import androidx.compose.foundation.clickable
+        import androidx.compose.foundation.*
         import androidx.compose.foundation.layout.*
         import androidx.compose.foundation.lazy.LazyColumn
         import androidx.compose.foundation.lazy.items
@@ -132,7 +130,7 @@
                         auftraege
                     }
                     Spacer(Modifier.height(GAP_S))
-                    Text("Auftragsliste", style = MaterialTheme.typography.h6)
+                    Text("📋 Auftragsliste (${displayed.size})", style = MaterialTheme.typography.h6)
                     Spacer(Modifier.height(GAP_XS))
 
                     // Hier itemsIndexed verwenden und Nummer umkehren
@@ -191,7 +189,9 @@
                     }
                     Spacer(Modifier.height(14.dp))
 
-                    Text("Schichtenliste", style = MaterialTheme.typography.h6)
+                    Text("🛠️ Schichtenliste (${selectedAuftrag?.schichten?.size ?: 0})", style = MaterialTheme.typography.h6)
+
+
 
                     Spacer(Modifier.height(GAP_XS))
 
@@ -220,51 +220,17 @@
 
 
                 /* Detailansicht */
-                Column(Modifier.weight(6f).padding(start = 18.dp)) {
+                Column(Modifier.weight(6f).padding(start = 8.dp)) {
+                    Spacer(Modifier.height(70.dp))
 
-                    Spacer(Modifier.height(GAP_S))
-
-                    selectedSchicht?.let { s ->
-                        // 1) Bearbeiten-Button oben
-
-                        Spacer(Modifier.width(GAP_M))
-                        Text("Details", style = MaterialTheme.typography.h6)
-
-                        // 2) Helpers zum sicheren Formatieren
-                        fun <T> List<T>?.toLabelList(label: (T) -> String): String =
-                            this?.takeIf { it.isNotEmpty() }
-                                ?.joinToString("\n") { "• ${label(it)}" }
-                                ?: "–"
-
-                        val personenTxt  = s.mitarbeiter.toLabelList { "${it.vorname} ${it.name}".trim() }
-                        val fahrzeugeTxt = s.fahrzeug.toLabelList   { it.bezeichnung.orEmpty() }
-                        val materialTxt  = s.material.toLabelList   { it.bezeichnung.orEmpty() }
-
-                        // 3) Die eigentliche Detail-Liste
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.spacedBy(GAP_S)
-                        ) {
-                            items(
-                                listOf(
-                                    "Start"       to s.startDatum?.format(dateTimeFmt).orEmpty().ifBlank { "–" },
-                                    "Ende"        to s.endDatum?.format(dateTimeFmt).orEmpty().ifBlank { "–" },
-                                    "Ort"         to s.ort.orEmpty().ifBlank { "–" },
-                                    "Strecke"     to s.strecke.orEmpty().ifBlank { "–" },
-                                    "Km"          to listOf(s.kmVon, s.kmBis).joinToString(" – ") { it.orEmpty() }.ifBlank { "–" },
-                                    "Maßnahme"    to s.massnahme.orEmpty().ifBlank { "–" },
-                                    "Mitarbeiter" to personenTxt,
-                                    "Fahrzeuge"   to fahrzeugeTxt,
-                                    "Material"    to materialTxt,
-                                    "Bemerkung"   to s.bemerkung.orEmpty().ifBlank { "–" }
-                                )
-                            ) { (label, value) ->
-                                Text(text = "$label:", style = MaterialTheme.typography.subtitle2)
-                                Text(text = value, style = MaterialTheme.typography.body2)
-                            }
-                        }
-                    } ?: Text("Keine Schicht ausgewählt", color = Color.Gray)
+                    if (selectedAuftrag != null) {
+                        Text("Auftragsdetails", style = MaterialTheme.typography.h6)
+                        AuftragDetailView(auftrag = selectedAuftrag)
+                    } else {
+                        Text("Kein Auftrag ausgewählt", color = Color.Gray)
+                    }
                 }
+
 
             }
 
@@ -1535,6 +1501,93 @@
                         Spacer(Modifier.width(8.dp))
                         Button(onClick = { onResult(selected) }) {
                             Text("Übernehmen")
+                        }
+                    }
+                }
+            }
+        }
+
+        @Composable
+        fun AuftragDetailView(auftrag: Auftrag) {
+            val dateTimeFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+
+            val bgColor = Color(0xFF555555)
+            val borderColor = Color(0xFF999999)
+            val textColor = AppStyle.Colors.TextPrimary
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp),
+                backgroundColor = bgColor,
+                elevation = 0.dp,
+                border = BorderStroke(1.dp, borderColor)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    // 📋 Auftrag-Daten
+                    Text("📋 Auftrag: ${auftrag.sapANummer.orEmpty()}", fontSize = AppStyle.TextSizes.Large, color = AppStyle.Colors.Warning)
+                    Text("📅 Start: ${auftrag.startDatum?.format(dateTimeFmt).orEmpty()}", fontSize = AppStyle.TextSizes.Normal, color = textColor)
+                    //Text("🏁 Ende: ${auftrag.endDatum?.format(dateTimeFmt).orEmpty()}", fontSize = AppStyle.TextSizes.Normal, color = textColor)
+                    Text("📍 Ort: ${auftrag.ort.orEmpty()}", fontSize = AppStyle.TextSizes.Normal, color = textColor)
+                    //Text("🛣️ Strecke: ${auftrag.strecke.orEmpty()}", fontSize = AppStyle.TextSizes.Normal, color = textColor)
+                    //Text("📏 Km: von ${auftrag.kmVon.orEmpty()} bis ${auftrag.kmBis.orEmpty()}", fontSize = AppStyle.TextSizes.Normal, color = textColor)
+                    Text("🏫 Maßnahme: ${auftrag.massnahme.orEmpty()}", fontSize = AppStyle.TextSizes.Normal, color = textColor)
+                    Text("📝 Bemerkung: ${auftrag.bemerkung.orEmpty()}", fontSize = AppStyle.TextSizes.Normal, color = textColor)
+
+                    Divider(color = AppStyle.Colors.Secondary.copy(alpha = 0.6f), thickness = 1.dp)
+
+                    Text("🔄 Schichten", fontSize = AppStyle.TextSizes.Large, color = AppStyle.Colors.Warning)
+
+                    auftrag.schichten.forEachIndexed { index, schicht ->
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("📦 Schicht ${index + 1}", fontSize = AppStyle.TextSizes.Normal, color = AppStyle.Colors.Warning)
+                            Text("⏱ Start: ${schicht.startDatum?.format(dateTimeFmt).orEmpty()}", fontSize = AppStyle.TextSizes.Small, color = textColor)
+                            Text("🏁 Ende: ${schicht.endDatum?.format(dateTimeFmt).orEmpty()}", fontSize = AppStyle.TextSizes.Small, color = textColor)
+                            Text("⏸️ Pause: ${schicht.pausenZeit} Min", fontSize = AppStyle.TextSizes.Small, color = textColor)
+                            Text("📍 Ort: ${schicht.ort.orEmpty()}", fontSize = AppStyle.TextSizes.Small, color = textColor)
+                            Text("🛣️ Strecke: ${schicht.strecke.orEmpty()}", fontSize = AppStyle.TextSizes.Small, color = textColor)
+                            Text("📏 Km: von ${schicht.kmVon.orEmpty()} bis ${schicht.kmBis.orEmpty()}", fontSize = AppStyle.TextSizes.Small, color = textColor)
+                            Text("🏫 Maßnahme: ${schicht.massnahme.orEmpty()}", fontSize = AppStyle.TextSizes.Small, color = textColor)
+
+                            if (!schicht.bemerkung.isNullOrBlank()) {
+                                Text("📝 Bemerkung: ${schicht.bemerkung}", fontSize = AppStyle.TextSizes.Small, color = textColor)
+                            }
+
+                            Spacer(Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text("👥 Mitarbeiter", fontSize = AppStyle.TextSizes.Normal, color = textColor)
+                                    schicht.mitarbeiter.forEach {
+                                        Text("• ${it.vorname.orEmpty()} ${it.name.orEmpty()} (${it.firma.orEmpty()})", fontSize = AppStyle.TextSizes.Small, color = textColor)
+                                    }
+                                }
+
+                                Column(Modifier.weight(1f)) {
+                                    Text("🚗 Fahrzeuge", fontSize = AppStyle.TextSizes.Normal, color = textColor)
+                                    schicht.fahrzeug.forEach {
+                                        Text("• ${it.bezeichnung.orEmpty()} – ${it.kennzeichen.orEmpty()}", fontSize = AppStyle.TextSizes.Small, color = textColor)
+                                    }
+                                }
+
+                                Column(Modifier.weight(1f)) {
+                                    Text("📦 Material", fontSize = AppStyle.TextSizes.Normal, color = textColor)
+                                    schicht.material.forEach {
+                                        Text("• ${it.bezeichnung.orEmpty()}", fontSize = AppStyle.TextSizes.Small, color = textColor)
+                                    }
+                                }
+                            }
+
+                            Divider(color = AppStyle.Colors.Secondary.copy(alpha = 0.3f), thickness = 1.dp)
                         }
                     }
                 }

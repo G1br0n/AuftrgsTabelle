@@ -9,7 +9,7 @@ import androidx.compose.ui.unit.sp
 
 object AppStyle {
 
-    var textScale by mutableStateOf(1.2f)
+    var textScale by mutableStateOf(0.8f)
 
     // === Farben ===
     object Colors {
