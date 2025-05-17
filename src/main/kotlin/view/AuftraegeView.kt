@@ -22,11 +22,13 @@
         import androidx.compose.ui.text.input.KeyboardType
         import androidx.compose.ui.text.input.PasswordVisualTransformation
         import androidx.compose.ui.text.input.TextFieldValue
+        import androidx.compose.ui.text.style.TextOverflow
         import androidx.compose.ui.unit.DpSize
         import androidx.compose.ui.unit.dp
         import androidx.compose.ui.unit.sp
         import androidx.compose.ui.window.*
         import elemente.*
+        import kotlinx.coroutines.launch
         import models.*
         import repository.AuftragRepository
         import viewModel.AuftraegeViewModel
@@ -62,6 +64,8 @@
 
             val auftraege by viewModel.auftraegeFlow.collectAsState(emptyList())
 
+            // Ein Scope fürs Starten von Coroutines in der UI
+            val uiScope = rememberCoroutineScope()
 
             // Auswahl nur über IDs
             var selectedAuftragId by remember { mutableStateOf<String?>(null) }
@@ -142,21 +146,21 @@
                             val number = displayed.size - idx
                             AuftragCard(
                                 auftrag  = auftrag,
-                                index    = number,
-                                selected = isSelected,
+                                index    = displayed.size - idx,
+                                selected = auftrag.id == selectedAuftragId,
                                 onSelect = {
                                     selectedAuftragId = auftrag.id
                                     selectedSchichtId = null
                                 },
-                                onEdit   = {
+                                onEdit = {
                                     selectedAuftragId = auftrag.id
                                     showAuftragForm   = true
                                 },
-                                onScan   = {
-                                    viewModel.scanStundenzettel(auftrag)
-
-                                           },
-
+                                onScan = {
+                                    uiScope.launch {
+                                        viewModel.scanStundenzettel(auftrag)
+                                    }
+                                },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .animateContentSize()
@@ -618,12 +622,17 @@
                     ) {
                         Text(
                             text = if (initial == null) "Neuen Auftrag anlegen" else "Auftrag bearbeiten",
-                            style = MaterialTheme.typography.subtitle1
+                            fontSize = AppStyle.TextSizes.Large,
+                            color = AppStyle.Colors.TextPrimary
                         )
                         OutlinedTextField(
-                            value = sapVal, onValueChange = { sapVal = it },
-                            label = { Text("📋  Stempel-A-SAP-Nummer") }, modifier = Modifier.fillMaxWidth()
+                            value = sapVal,
+                            onValueChange = { sapVal = it },
+                            label = { Text("📋  Stempel-A-SAP-Nummer", fontSize = AppStyle.TextSizes.Small) },
+                            modifier = Modifier.fillMaxWidth(),
+                            textStyle = LocalTextStyle.current.copy(fontSize = AppStyle.TextSizes.Normal)
                         )
+
                         /*OutlinedTextField(
                             value = ortVal, onValueChange = { ortVal = it },
                             label = { Text("Ort") }, modifier = Modifier.fillMaxWidth()
@@ -644,7 +653,7 @@
                         }*/
                         OutlinedTextField(
                             value = massnahmeVal, onValueChange = { massnahmeVal = it },
-                            label = { Text("🏫  Maßnahme/Ort") }, modifier = Modifier.fillMaxWidth()
+                            label = { Text("🏫  Maßnahme/Ort", fontSize = AppStyle.TextSizes.Small) }, modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = bemerkungVal, onValueChange = { bemerkungVal = it },
@@ -881,7 +890,8 @@
             Column(Modifier.fillMaxWidth().padding(16.dp)) {
                 Text(
                     if (initial == null) "Neue Schicht hinzufügen" else "Schicht bearbeiten",
-                    style = MaterialTheme.typography.body1
+                    fontSize = AppStyle.TextSizes.Large,
+                    color = AppStyle.Colors.TextPrimary
                 )
                 Spacer(Modifier.height(12.dp))
 
@@ -930,43 +940,49 @@
                         OutlinedTextField(
                             value = ortVal,
                             onValueChange = { ortVal = it },
-                            label = { Text("Ort") },
+                            label = {
+                                Text("Ort", fontSize = AppStyle.TextSizes.Small)
+                            },
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = streckeVal,
                             onValueChange = { streckeVal = it },
-                            label = { Text("Strecke") },
+                            label = { Text("Strecke", fontSize = AppStyle.TextSizes.Small) },
                             modifier = Modifier.fillMaxWidth()
                         )
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedTextField(
                                 value = kmVonVal,
                                 onValueChange = { kmVonVal = it },
-                                label = { Text("Km von") },
+                                label = { Text("Km von", fontSize = AppStyle.TextSizes.Small) },
                                 modifier = Modifier.weight(1f)
                             )
                             OutlinedTextField(
                                 value = kmBisVal,
                                 onValueChange = { kmBisVal = it },
-                                label = { Text("Km bis") },
+                                label = { Text("Km bis", fontSize = AppStyle.TextSizes.Small) },
                                 modifier = Modifier.weight(1f)
                             )
                         }
                         OutlinedTextField(
                             value = massnahmeVal,
                             onValueChange = { massnahmeVal = it },
-                            label = { Text("Maßnahme") },
+                            label = { Text("Maßnahme", fontSize = AppStyle.TextSizes.Small) },
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = bemerkungVal,
                             onValueChange = { bemerkungVal = it },
-                            label = { Text("Bemerkung") },
+                            label = { Text("Bemerkung", fontSize = AppStyle.TextSizes.Small) },
                             modifier = Modifier.fillMaxWidth()
                         )
                         if (startErr || endErr) {
-                            Text("Bitte gültiges Datum & Zeit auswählen", color = MaterialTheme.colors.error)
+                            Text(
+                                "Bitte gültiges Datum & Zeit auswählen",
+                                fontSize = AppStyle.TextSizes.Small,
+                                color = AppStyle.Colors.Error
+                            )
                         }
                     }
 
@@ -1076,8 +1092,13 @@
                         println("SchichtForm: Schließen abgebrochen")
                         confirmClose = false
                     },
-                    title = { Text("Änderungen verwerfen?") },
-                    text  = { Text("Alle Änderungen gehen verloren. Wirklich schließen?") },
+                    title = { Text("Änderungen verwerfen?", fontSize = AppStyle.TextSizes.Normal) },
+                    text = {
+                        Text(
+                            "Alle Änderungen gehen verloren. Wirklich schließen?",
+                            fontSize = AppStyle.TextSizes.Small
+                        )
+                    },
                     confirmButton = {
                         TextButton(onClick = {
                             println("SchichtForm: Schließen bestätigt")
@@ -1208,33 +1229,29 @@
         /* ==========================================================
         *  view/AuftragCard.kt
         * ========================================================== */
-    @Composable
+        @Composable
         fun AuftragCard(
-            auftrag:  Auftrag,
-            index:    Int,
+            auftrag: Auftrag,
+            index: Int,
             selected: Boolean,
             onSelect: () -> Unit,
-            onEdit:   () -> Unit,
-            onScan:   () -> Unit,        // neu
+            onEdit: () -> Unit,
+            onScan: () -> Unit,
             modifier: Modifier = Modifier,
-
         ) {
-            /* – Farben unverändert – */
-            val grayNormal   = Color(0xFF555555)
-            val graySelected = Color(0xFF777777)
-            val grayBorder   = Color(0xFF999999)
-            val bgColor      = if (selected) graySelected else grayNormal
-            val txtColor     = Color.White
-            val dateTimeFmt: DateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+            val bgColor = if (selected) Color(0xFF777777) else Color(0xFF555555)
+            val borderColor = Color(0xFF999999)
+            val dateTimeFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
             val schichtCount = auftrag.schichten?.size ?: 0
-            val startTxt     = auftrag.startDatum?.format(dateTimeFmt).orEmpty()
+            val startTxt = auftrag.startDatum?.format(dateTimeFmt).orEmpty()
+
             Card(
                 modifier = modifier
                     .fillMaxWidth()
                     .clickable(onClick = onSelect),
                 backgroundColor = bgColor,
-                elevation       = 0.dp,
-                border          = BorderStroke(1.dp, grayBorder)
+                elevation = 0.dp,
+                border = BorderStroke(1.dp, borderColor)
             ) {
                 Row(
                     Modifier
@@ -1242,64 +1259,82 @@
                         .fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-
-                    /* -------- linke Spalte -------- */
+                    // Linke Spalte
                     Column(
                         modifier = Modifier.weight(10f),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-
                         Row {
                             Text(
-                                "${index}. 📋 : ${auftrag.sapANummer.orEmpty()}     ",
-                                style = MaterialTheme.typography.subtitle1,
-                                color = Color.Yellow
+                                text = "${index}. 📋 : ${auftrag.sapANummer.orEmpty()}",
+                                style = MaterialTheme.typography.subtitle1.copy(
+                                    fontSize = AppStyle.TextSizes.Normal
+                                ),
+                                color = AppStyle.Colors.Warning,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
-                            Text("🛠️ : $schichtCount",color = txtColor)
-                        }
-                        Text("    📅 : $startTxt", color = Color.Green)
-                        if(auftrag.massnahme?.toList()?.isEmpty() != true){
-                            Text("    🏫 :  ${auftrag.massnahme}", color = txtColor)
+                            Text(
+                                text = "🛠️ : $schichtCount",
+                                fontSize = AppStyle.TextSizes.Small,
+                                color = AppStyle.Colors.TextPrimary
+                            )
                         }
 
+                        Text(
+                            text = "    📅 : $startTxt",
+                            fontSize = AppStyle.TextSizes.Small,
+                            color = Color.Green
+                        )
 
+                        if (!auftrag.massnahme.isNullOrEmpty()) {
+                            Text(
+                                text = "    🏫 : ${auftrag.massnahme}",
+                                fontSize = AppStyle.TextSizes.Small,
+                                color = AppStyle.Colors.TextPrimary
+                            )
+                        }
 
                         if (!auftrag.bemerkung.isNullOrEmpty()) {
                             Text(
-                                "    🚨 : ${auftrag.bemerkung}",
-                                color = txtColor
+                                text = "    🚨 : ${auftrag.bemerkung}",
+                                fontSize = AppStyle.TextSizes.Small,
+                                color = AppStyle.Colors.TextPrimary
                             )
                         }
-
                     }
 
-                    /* -------- rechte Spalte: Bearbeiten‑Button -------- */
+                    // Rechte Spalte: Buttons
                     Column(Modifier.weight(1f)) {
                         IconButton(
                             onClick = onEdit,
                             modifier = Modifier
-                                .size(36.dp)                      // Größe anpassen
-                                .background(grayNormal, shape = CircleShape) // optionaler Hintergrund
+                                .size(36.dp)
+                                .background(Color(0xFF555555), shape = CircleShape)
                         ) {
                             Text(
-                                "⚙️ ",
-                                fontSize = 20.sp,                // Schriftgröße anpassen
+                                "⚙️",
+                                fontSize = AppStyle.TextSizes.Normal
                             )
                         }
 
-                        IconButton(
+                       /* IconButton(
                             onClick = onScan,
                             modifier = Modifier
                                 .size(32.dp)
-                                .background(grayNormal, shape = CircleShape)
+                                .background(Color(0xFF555555), shape = CircleShape)
                         ) {
-                            Icon(Icons.Default.KeyboardArrowDown, tint = Color.White, contentDescription = "Scan")
-                        }
+                            Icon(
+                                Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Scan",
+                                tint = AppStyle.Colors.TextPrimary
+                            )
+                        }*/
                     }
-
                 }
             }
         }
+
 
 
 
@@ -1314,27 +1349,25 @@
             onSelect: () -> Unit = {},
             onEdit: () -> Unit = {}
         ) {
-            val grayNormal   = Color(0xFF555555)
-            val graySelected = Color(0xFF777777)
-            val grayBorder   = Color(0xFF999999)
-            val bgColor      = if (selected) graySelected else grayNormal
-            val txtColor     = Color.White
+            val bgColor = if (selected) Color(0xFF777777) else Color(0xFF555555)
+            val borderColor = Color(0xFF999999)
+            val txtColor = AppStyle.Colors.TextPrimary
 
-            val dateFmt      = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
-            val startTxt     = schicht.startDatum?.format(dateFmt).orEmpty()
-            val endTxt       = schicht.endDatum?.format(dateFmt).orEmpty()
-            val pauseMin     = schicht.pausenZeit
-            val total        = schicht.startDatum?.let { s -> schicht.endDatum?.let { e -> Duration.between(s, e) } }
-            val netto        = total?.minusMinutes(pauseMin.toLong())
+            val dateFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
+            val startTxt = schicht.startDatum?.format(dateFmt).orEmpty()
+            val endTxt = schicht.endDatum?.format(dateFmt).orEmpty()
+            val pauseMin = schicht.pausenZeit
+            val total = schicht.startDatum?.let { s -> schicht.endDatum?.let { e -> Duration.between(s, e) } }
+            val netto = total?.minusMinutes(pauseMin.toLong())
             val durationText = if (netto != null) String.format("%dh %02dm", netto.toHours(), netto.toMinutesPart()) else "–"
 
             Card(
-                modifier       = Modifier
+                modifier = Modifier
                     .fillMaxWidth()
                     .clickable(onClick = onSelect),
                 backgroundColor = bgColor,
-                elevation       = 0.dp,
-                border          = BorderStroke(1.dp, grayBorder)
+                elevation = 0.dp,
+                border = BorderStroke(1.dp, borderColor)
             ) {
                 Row(
                     Modifier
@@ -1348,80 +1381,81 @@
                     ) {
                         Text(
                             text = "${index}  : Schicht",
-                            style = MaterialTheme.typography.subtitle1,
-                            color = Color.Yellow
+                            fontSize = AppStyle.TextSizes.Normal,
+                            color = AppStyle.Colors.Warning
                         )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
 
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Spacer(Modifier.width(8.dp))
+
                             Column {
                                 Text(
                                     text = "🚀 : $startTxt",
-                                    style = MaterialTheme.typography.body2,
+                                    fontSize = AppStyle.TextSizes.Small,
                                     color = txtColor
                                 )
                                 Spacer(Modifier.width(16.dp))
                                 Text(
                                     text = "🏁 : $endTxt",
-                                    style = MaterialTheme.typography.body2,
+                                    fontSize = AppStyle.TextSizes.Small,
                                     color = txtColor
                                 )
                             }
+
                             Column {
                                 Text(
                                     text = "   ⏸️ : ${pauseMin}m",
-                                    style = MaterialTheme.typography.body2,
+                                    fontSize = AppStyle.TextSizes.Small,
                                     color = txtColor
                                 )
                                 Spacer(Modifier.width(16.dp))
                                 Text(
                                     text = "   🕔 : $durationText",
-                                    style = MaterialTheme.typography.body2,
+                                    fontSize = AppStyle.TextSizes.Small,
                                     color = txtColor
                                 )
                             }
-
-
                         }
-
 
                         Row {
                             if (schicht.mitarbeiter.isNotEmpty()) {
                                 Text(
                                     text = "  👥 : ${schicht.mitarbeiter.size}",
-                                    style = MaterialTheme.typography.body2,
+                                    fontSize = AppStyle.TextSizes.Small,
                                     color = txtColor
                                 )
                             }
                             if (schicht.fahrzeug.isNotEmpty()) {
                                 Text(
                                     text = "          🚗 : ${schicht.fahrzeug.size}",
-                                    style = MaterialTheme.typography.body2,
+                                    fontSize = AppStyle.TextSizes.Small,
                                     color = txtColor
                                 )
                             }
                             if (schicht.material.isNotEmpty()) {
                                 Text(
                                     text = "         📦 : ${schicht.material.size}",
-                                    style = MaterialTheme.typography.body2,
+                                    fontSize = AppStyle.TextSizes.Small,
                                     color = txtColor
                                 )
                             }
                         }
-
                     }
+
                     Column(Modifier.weight(1f)) {
                         IconButton(
                             onClick = onEdit,
                             modifier = Modifier
                                 .size(36.dp)
-                                .background(grayNormal, shape = CircleShape)
+                                .background(Color(0xFF555555), shape = CircleShape)
                         ) {
-                           Text("⚙️ ")
+                            Text(
+                                "⚙️",
+                                fontSize = AppStyle.TextSizes.Normal
+                            )
                         }
                     }
                 }
-
             }
         }
 

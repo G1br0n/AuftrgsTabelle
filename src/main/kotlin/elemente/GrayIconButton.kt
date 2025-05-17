@@ -24,13 +24,13 @@ fun GrayIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     fullWidth: Boolean = false,
-    enabled: Boolean = true                        // <-- NEU
+    enabled: Boolean = true
 ) {
-    var isHovered  by remember { mutableStateOf(false) }
+    var isHovered by remember { mutableStateOf(false) }
     var showTooltip by remember { mutableStateOf(false) }
 
     LaunchedEffect(isHovered) {
-        if (isHovered && enabled) {               // Tooltip nur bei aktivem Button
+        if (isHovered && enabled) {
             kotlinx.coroutines.delay(1_000)
             if (isHovered) showTooltip = true
         } else showTooltip = false
@@ -40,40 +40,57 @@ fun GrayIconButton(
         modifier = modifier
             .padding(horizontal = 4.dp)
             .onPointerEvent(PointerEventType.Enter) { isHovered = true }
-            .onPointerEvent(PointerEventType.Exit)  { isHovered = false }
+            .onPointerEvent(PointerEventType.Exit) { isHovered = false }
     ) {
         val buttonMod = if (fullWidth) Modifier.fillMaxWidth() else Modifier.wrapContentWidth()
 
+        val bgColor = when {
+            !enabled   -> AppStyle.Colors.TextSecondary
+            selected   -> Color(0xFF777777) // optional: eigene AppStyle-Farbe
+            else       -> AppStyle.Colors.Background
+        }
+
         Button(
-            onClick  = onClick,
-            enabled  = enabled,                   // <-- weiterreichen
+            onClick = onClick,
+            enabled = enabled,
             modifier = buttonMod,
-            colors   = ButtonDefaults.buttonColors(
-                backgroundColor =
-                    if (!enabled) Color(0xFF999999)
-                    else if (selected) Color(0xFF777777)
-                    else Color(0xFF555555)
+            colors = ButtonDefaults.buttonColors(
+                backgroundColor      = AppStyle.Colors.Primary,
+                contentColor         = AppStyle.Colors.TextPrimary,
+                disabledBackgroundColor = AppStyle.Colors.TextSecondary,
+                disabledContentColor = Color.DarkGray
             )
         ) {
             if (icon != null) {
-                Icon(icon, contentDescription = label, tint = Color.White)
+                Icon(icon, contentDescription = label, tint = AppStyle.Colors.TextPrimary)
                 if (label.isNotEmpty()) Spacer(Modifier.width(8.dp))
             }
-            if (label.isNotEmpty()) Text(label, color = Color.White)
+            if (label.isNotEmpty()) {
+                Text(
+                    text = label,
+                    color = AppStyle.Colors.TextPrimary,
+                    fontSize = AppStyle.TextSizes.Normal
+                )
+            }
         }
 
         if (showTooltip && tooltip.isNotEmpty()) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .background(Color(0xFFEEEEEE), RoundedCornerShape(4.dp))
+                    .background(AppStyle.Colors.Secondary, RoundedCornerShape(4.dp))
                     .padding(4.dp)
             ) {
-                Text(tooltip, color = Color.Black, style = MaterialTheme.typography.caption)
+                Text(
+                    tooltip,
+                    color = AppStyle.Colors.TextPrimary,
+                    fontSize = AppStyle.TextSizes.Small
+                )
             }
         }
     }
 }
+
 
 /* --------------------------------------------------------------
    Wrapper bleiben gleich; sie bekommen optional das neue Flag.
