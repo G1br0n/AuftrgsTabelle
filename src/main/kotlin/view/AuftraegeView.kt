@@ -920,20 +920,6 @@
                                 label = { Text("Strecke", fontSize = AppStyle.TextSizes.Small) },
                                 modifier = Modifier.fillMaxWidth()
                             )
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedTextField(
-                                    value = kmVonVal,
-                                    onValueChange = { kmVonVal = it },
-                                    label = { Text("Km von", fontSize = AppStyle.TextSizes.Small) },
-                                    modifier = Modifier.weight(1f)
-                                )
-                                OutlinedTextField(
-                                    value = kmBisVal,
-                                    onValueChange = { kmBisVal = it },
-                                    label = { Text("Km bis", fontSize = AppStyle.TextSizes.Small) },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
                             OutlinedTextField(
                                 value = massnahmeVal,
                                 onValueChange = { massnahmeVal = it },
@@ -965,7 +951,19 @@
                                 selected = false,
                                 onClick  = { showPersonDlg = true }
                             )
-                            LazyColumn(Modifier.height(500.dp)) {
+                            Spacer(Modifier.height(12.dp))
+
+
+
+                                OutlinedTextField(
+                                    value = kmBisVal,
+                                    onValueChange = { kmBisVal = it },
+                                    label = { Text("Anzahl Voraus", fontSize = AppStyle.TextSizes.Small) },
+                                    modifier = Modifier.width(200.dp) .heightIn(50.dp).padding(8.dp)
+                                )
+
+                            Spacer(Modifier.height(12.dp))
+                            LazyColumn(Modifier.height(450.dp)) {
                                 itemsIndexed(personsSel.toList()) { idx, p ->
                                     Text("${idx + 1}. ${p.vorname} ${p.name}")       // Nummerierung
                                 }
@@ -1329,6 +1327,7 @@
                 val total = schicht.startDatum?.let { s -> schicht.endDatum?.let { e -> Duration.between(s, e) } }
                 val netto = total?.minusMinutes(pauseMin.toLong())
                 val durationText = if (netto != null) String.format("%dh %02dm", netto.toHours(), netto.toMinutesPart()) else "–"
+                val voraus: String? = schicht.kmBis
 
                 Card(
                     modifier = Modifier
@@ -1389,7 +1388,13 @@
                             Row {
                                 if (schicht.mitarbeiter.isNotEmpty()) {
                                     Text(
-                                        text = "  👥 : ${schicht.mitarbeiter.size}",
+                                        text = "  👥 : ${schicht.mitarbeiter.size}/${schicht.kmBis}",
+                                        fontSize = AppStyle.TextSizes.Small,
+                                        color = txtColor
+                                    )
+                                } else {
+                                    Text(
+                                        text = "  👥 : 0/${schicht.kmBis}",
                                         fontSize = AppStyle.TextSizes.Small,
                                         color = txtColor
                                     )
@@ -1523,6 +1528,10 @@
                 val warnColor   = AppStyle.Colors.Warning
                 val bgColor     = AppStyle.Colors.Primary
                 val borderColor = AppStyle.Colors.Secondary
+                val mitarbeiterCount = schicht.mitarbeiter.size
+                val fahrzeugCount   = schicht.fahrzeug.size
+                val materialCount   = schicht.material.size
+                val voraus: String? = schicht.kmBis
 
                 // Berechne Netto-Stunden
                 val duration = schicht.startDatum?.let { s ->
@@ -1625,8 +1634,12 @@
                         ) {
                             // Mitarbeiter
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("👥 Mitarbeiter", fontSize = AppStyle.TextSizes.Large, color = warnColor)
-                                if (schicht.mitarbeiter.isEmpty()) {
+                                Text(
+                                    "👥 Mitarbeiter: $mitarbeiterCount/${voraus}",
+                                    fontSize = AppStyle.TextSizes.Large,
+                                    color    = warnColor
+                                )
+                                if (mitarbeiterCount == 0) {
                                     Text("– keine –", fontSize = AppStyle.TextSizes.Small, color = AppStyle.Colors.TextSecondary)
                                 } else {
                                     schicht.mitarbeiter.forEach { m ->
@@ -1641,8 +1654,12 @@
 
                             // Fahrzeuge
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("🚗 Fahrzeuge", fontSize = AppStyle.TextSizes.Large, color = warnColor)
-                                if (schicht.fahrzeug.isEmpty()) {
+                                Text(
+                                    "🚗 Fahrzeuge: $fahrzeugCount",
+                                    fontSize = AppStyle.TextSizes.Large,
+                                    color    = warnColor
+                                )
+                                if (fahrzeugCount == 0) {
                                     Text("– keine –", fontSize = AppStyle.TextSizes.Small, color = AppStyle.Colors.TextSecondary)
                                 } else {
                                     schicht.fahrzeug.forEach { f ->
@@ -1657,8 +1674,12 @@
 
                             // Material
                             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text("📦 Material", fontSize = AppStyle.TextSizes.Large, color = warnColor)
-                                if (schicht.material.isEmpty()) {
+                                Text(
+                                    "📦 Material: $materialCount",
+                                    fontSize = AppStyle.TextSizes.Large,
+                                    color    = warnColor
+                                )
+                                if (materialCount == 0) {
                                     Text("– kein –", fontSize = AppStyle.TextSizes.Small, color = AppStyle.Colors.TextSecondary)
                                 } else {
                                     schicht.material.forEach { mat ->
