@@ -859,8 +859,8 @@
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {
                     Text(
                         if (initial == null) "Neue Schicht hinzufügen" else "Schicht bearbeiten",
-                        fontSize = AppStyle.TextSizes.Large,
-                        color = AppStyle.Colors.TextPrimary
+                        fontSize = AppStyle.TextSizes.ExtraLarge,
+                        color = AppStyle.Colors.TextSecondary
                     )
                     Spacer(Modifier.height(12.dp))
 
@@ -901,12 +901,12 @@
                             OutlinedTextField(
                                 value = pauseVal,
                                 onValueChange = { pauseVal = it },
-                                label = { Text("Pausenzeit [Min]") },
+                                label = { Text("⏸️ Pausenzeit [Min]") },
                                 isError = pauseErr,
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
-                            OutlinedTextField(
+                         /*   OutlinedTextField(
                                 value = ortVal,
                                 onValueChange = { ortVal = it },
                                 label = {
@@ -925,12 +925,36 @@
                                 onValueChange = { massnahmeVal = it },
                                 label = { Text("Maßnahme", fontSize = AppStyle.TextSizes.Small) },
                                 modifier = Modifier.fillMaxWidth()
-                            )
+                            )*/
                             OutlinedTextField(
                                 value = bemerkungVal,
                                 onValueChange = { bemerkungVal = it },
-                                label = { Text("Bemerkung", fontSize = AppStyle.TextSizes.Small) },
+                                label = { Text("🚨 Schicht Bemerkung", fontSize = AppStyle.TextSizes.Small) },
                                 modifier = Modifier.fillMaxWidth()
+                            )
+                            OutlinedTextField(
+                                value = kmBisVal,
+                                onValueChange = { kmBisVal = it },
+                                label = { Text("👷🏼‍♂️ Geplante Mitarbeiter Anzahl eintragen", fontSize = AppStyle.TextSizes.Small) },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            GrayIconButton(
+                                label    = "👷🏼‍♂️ Mitarbeiter Hinzufüge: (${personsSel.size})",      // Count im Header
+                                tooltip  = "Mitarbeiter wählen",
+                                selected = false,
+                                onClick  = { showPersonDlg = true }
+                            )
+                            GrayIconButton(
+                                label    = "🚘 Fahrzeuge Hinzufüge: (${fahrzeugeSel.size})",     // Count im Header
+                                tooltip  = "Fahrzeuge wählen",
+                                selected = false,
+                                onClick  = { showFahrzeugDlg = true }
+                            )
+                            GrayIconButton(
+                                label    = "📦 Material Hinzufüge:(${materialSel.size})",       // Count im Header
+                                tooltip  = "Material wählen",
+                                selected = false,
+                                onClick  = { showMaterialDlg = true }
                             )
                             if (startErr || endErr) {
                                 Text(
@@ -944,25 +968,8 @@
                         // Auswahl-Spalten gleichmäßig aufteilen
                         // --- Personen ---
                         Column(Modifier.weight(2f).padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            GrayIconButton(
-                                Icons.Default.Person,
-                                label    = "Mitarbeiter (${personsSel.size})",      // Count im Header
-                                tooltip  = "Mitarbeiter wählen",
-                                selected = false,
-                                onClick  = { showPersonDlg = true }
-                            )
-                            Spacer(Modifier.height(12.dp))
 
-
-
-                                OutlinedTextField(
-                                    value = kmBisVal,
-                                    onValueChange = { kmBisVal = it },
-                                    label = { Text("Anzahl Voraus", fontSize = AppStyle.TextSizes.Small) },
-                                    modifier = Modifier.width(200.dp) .heightIn(50.dp).padding(8.dp)
-                                )
-
-                            Spacer(Modifier.height(12.dp))
+                            Text("👷🏼‍♂️ Mitarbeiter Liste(${personsSel.size})")
                             LazyColumn(Modifier.height(450.dp)) {
                                 itemsIndexed(personsSel.toList()) { idx, p ->
                                     Text("${idx + 1}. ${p.vorname} ${p.name}")       // Nummerierung
@@ -972,13 +979,7 @@
 
                         // --- Fahrzeuge ---
                         Column(Modifier.weight(2f).padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            GrayIconButton(
-                                Icons.Default.Settings,
-                                label    = "Fahrzeuge (${fahrzeugeSel.size})",     // Count im Header
-                                tooltip  = "Fahrzeuge wählen",
-                                selected = false,
-                                onClick  = { showFahrzeugDlg = true }
-                            )
+                            Text("🚘 Fahrzeug Liste(${fahrzeugeSel.size})")
                             LazyColumn(Modifier.height(500.dp)) {
                                 itemsIndexed(fahrzeugeSel.toList()) { idx, f ->
                                     Text("${idx + 1}. ${f.bezeichnung.orEmpty()}")
@@ -988,13 +989,7 @@
 
                         // --- Material ---
                         Column(Modifier.weight(2f).padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            GrayIconButton(
-                                Icons.Default.Build,
-                                label    = "Material (${materialSel.size})",       // Count im Header
-                                tooltip  = "Material wählen",
-                                selected = false,
-                                onClick  = { showMaterialDlg = true }
-                            )
+                            Text("📦 Material Lieste(${materialSel.size})")
                             LazyColumn(Modifier.height(500.dp)) {
                                 itemsIndexed(materialSel.toList()) { idx, m ->
                                     Text("${idx + 1}. ${m.bezeichnung.orEmpty()}")
@@ -1605,7 +1600,7 @@
                         }
 
                         // ** NEU: Strecke/Kilometer als eigene Zeile **
-                        Text(
+                  /*      Text(
                             text     = "🛣️ Strecke: von ${schicht.kmVon.orEmpty()} bis ${schicht.kmBis.orEmpty()}",
                             fontSize = AppStyle.TextSizes.Normal,
                             color    = textColor
@@ -1616,7 +1611,7 @@
                             text     = "🏫 Maßnahme: ${schicht.massnahme.orEmpty()}",
                             fontSize = AppStyle.TextSizes.Normal,
                             color    = textColor
-                        )
+                        )*/
                         if (!schicht.bemerkung.isNullOrBlank()) {
                             Text(
                                 text     = "📝 Bemerkung: ${schicht.bemerkung}",
