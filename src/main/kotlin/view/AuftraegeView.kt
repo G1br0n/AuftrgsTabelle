@@ -306,9 +306,21 @@
                                 if (selectedAuftrag == null) {
                                     viewModel.addAuftrag(basis)
                                 } else {
-                                    viewModel.updateAuftrag(basis)
+                                    // Kopiere alle alten Schichten in den aktualisierten Auftrag
+                                    val updated = selectedAuftrag.copy(
+                                        sapANummer = basis.sapANummer,
+                                        startDatum = basis.startDatum,
+                                        endDatum   = basis.endDatum,
+                                        ort        = basis.ort,
+                                        strecke    = basis.strecke,
+                                        kmVon      = basis.kmVon,
+                                        kmBis      = basis.kmBis,
+                                        massnahme  = basis.massnahme,
+                                        bemerkung  = basis.bemerkung,
+                                        schichten  = selectedAuftrag.schichten.orEmpty()   // ← hier die alten Schichten erhalten
+                                    )
+                                    viewModel.updateAuftrag(updated)
                                 }
-
                                 showAuftragForm   = false
                                 selectedAuftragId = basis.id
                             },
