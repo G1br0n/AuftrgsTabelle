@@ -92,8 +92,16 @@
                         .fillMaxSize()
                         .padding(GAP_M)
                 ) {
+                    Divider(
+                        color = Color.Black,
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(0.5.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
                     /* Auftragsliste */
                     Column(Modifier.weight(3f)) {
+
                         Row(
                             Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -167,8 +175,14 @@
                         }
                     }
 
-                    Spacer(Modifier.width(GAP_M))
-
+                    Spacer(Modifier.width(4.dp))
+                    Divider(
+                        color = Color.Black,
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(0.5.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
                     /* Schichtenliste */
                     Column(Modifier.weight(4f)) {
                         selectedAuftrag?.let {
@@ -189,21 +203,28 @@
                         }
                         Spacer(Modifier.height(14.dp))
 
-                        Text("🛠️ Schichtenliste (${selectedAuftrag?.schichten?.size ?: 0})", style = MaterialTheme.typography.h6)
+                        // Vor dem Header
+                        val displayedSchichten = selectedAuftrag
+                            ?.schichten
+                            ?.sortedByDescending { it.startDatum }
+                            .orEmpty()
 
-
-
+                        Text(
+                            "🛠️ Schichtenliste (${displayedSchichten.size})",
+                            style = MaterialTheme.typography.h6
+                        )
                         Spacer(Modifier.height(GAP_XS))
 
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(GAP_S)) {
-                            items(
-                                items = selectedAuftrag?.schichten.orEmpty(),
-                                key = { it.id }
-                            ) { schicht ->
-                                val idx = selectedAuftrag?.schichten?.indexOf(schicht)?.plus(1)
+                            itemsIndexed(
+                                items = displayedSchichten,
+                                key = { _, schicht -> schicht.id }
+                            ) { idx, schicht ->
+                                // Reverse-Nummer: Gesamtzahl minus aktueller Index
+                                val number = displayedSchichten.size - idx
                                 SchichtCard(
                                     schicht  = schicht,
-                                    index    = idx!!,
+                                    index    = number,
                                     selected = schicht.id == selectedSchichtId,
                                     onSelect = { selectedSchichtId = schicht.id },
                                     onEdit   = {
@@ -215,10 +236,17 @@
                         }
 
 
+
                     }
 
-
-
+                    Spacer(Modifier.width(4.dp))
+                    Divider(
+                        color = Color.Black,
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(0.5.dp)
+                    )
+                    Spacer(Modifier.width(4.dp))
                     /* Detailansicht */
                     /* Detailansicht */
                     Column(Modifier.weight(6f).padding(start = 8.dp)) {
@@ -250,18 +278,21 @@
                         AuftragForm(
                             initial = selectedAuftrag,
                             onSave = { id, sap, ort, strecke, kmVon, kmBis,
-                                       massnahme, bemerkung, lieferDatum,
-                                       modus,
-                                       startDate, startTime,
-                                       endDate, endTime,
-                                       anzahl, dauer ->
+                                                massnahme, bemerkung,
+                                                lieferDatum, lieferDatumBis,  // neu
+                                                modus,
+                                                startDate, startTime,
+                                                endDate,   endTime,
+                                                anzahl,    dauer ->
 
-                                // 1) Basis-Auftrag bauen
+                                // Hier baust du dein Auftrag-Objekt,
+                                // trägst lieferDatum in startDatum und
+                                // lieferDatumBis in endDatum ein:
                                 val basis = Auftrag(
                                     id         = id ?: UUID.randomUUID().toString(),
                                     sapANummer = sap,
                                     startDatum = lieferDatum,
-                                    endDatum   = null,
+                                    endDatum   = lieferDatumBis,
                                     ort        = ort,
                                     strecke    = strecke,
                                     kmVon      = kmVon,
@@ -271,50 +302,13 @@
                                     schichten  = emptyList()
                                 )
 
-                                // 2) Datum + Zeit in LocalDateTime umwandeln
-                                val startDT = if (modus == WiederholungsModus.KEINE) null
-                                else if (startDate != null && startTime != null)
-                                    LocalDateTime.of(startDate, startTime)
-                                else return@AuftragForm
-
-                                val endDT = when (modus) {
-                                    WiederholungsModus.TAEGLICH ->
-                                        if (endDate != null && endTime != null)
-                                            LocalDateTime.of(endDate, endTime)
-                                        else return@AuftragForm
-                                    else -> null
-                                }
-
-                                // 3) Aktion ausführen
-                                if (modus == WiederholungsModus.KEINE) {
-                                    if (selectedAuftrag == null) {
-                                        viewModel.addAuftrag(basis)
-                                    } else {
-                                        viewModel.updateAuftrag(
-                                            selectedAuftrag.copy(
-                                                sapANummer = sap,
-                                                startDatum = lieferDatum,
-                                                ort        = ort,
-                                                strecke    = strecke,
-                                                kmVon      = kmVon,
-                                                kmBis      = kmBis,
-                                                massnahme  = massnahme,
-                                                bemerkung  = bemerkung
-                                            )
-                                        )
-                                    }
+                                // Rest wie gehabt:
+                                if (selectedAuftrag == null) {
+                                    viewModel.addAuftrag(basis)
                                 } else {
-                                    viewModel.addAuftragAutomatisch(
-                                        basis  = basis,
-                                        modus  = modus,
-                                        start  = startDT!!,
-                                        ende   = endDT,
-                                        anzahl = anzahl,
-                                        dauer  = dauer ?: 8L
-                                    )
+                                    viewModel.updateAuftrag(basis)
                                 }
 
-                                // 4) UI-Status zurücksetzen
                                 showAuftragForm   = false
                                 selectedAuftragId = basis.id
                             },
@@ -537,16 +531,28 @@
             fun AuftragForm(
                 initial: Auftrag?,
                 onSave: (
-                    id: String?, sap: String, ort: String, strecke: String,
-                    kmVon: String, kmBis: String, massnahme: String, bemerkung: String,
-                    lieferDatum: LocalDateTime?, modus: WiederholungsModus,
-                    startDate: LocalDate?, startTime: LocalTime?,
-                    endDate: LocalDate?, endTime: LocalTime?, anzahl: Int?, dauer: Long?
+                    id: String?,
+                    sap: String,
+                    ort: String,
+                    strecke: String,
+                    kmVon: String,
+                    kmBis: String,
+                    massnahme: String,
+                    bemerkung: String,
+                    lieferDatum: LocalDateTime?,         // bisher
+                    lieferDatumBis: LocalDateTime?,      // neu
+                    modus: WiederholungsModus,
+                    startDate: LocalDate?,
+                    startTime: LocalTime?,
+                    endDate: LocalDate?,
+                    endTime: LocalTime?,
+                    anzahl: Int?,
+                    dauer: Long?
                 ) -> Unit,
                 onDelete: (() -> Unit)? = null,
                 onCancel: () -> Unit,
                 vm: AuftraegeViewModel = remember { AuftraegeViewModel() }
-            ) {
+            ){
                 val dateTimeFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
                 var showDeleteDialog by remember { mutableStateOf(false) }
                 var deletePassword by remember { mutableStateOf("") }
@@ -560,6 +566,7 @@
                 var massnahmeVal by remember { mutableStateOf(initial?.massnahme.orEmpty()) }
                 var bemerkungVal by remember { mutableStateOf(initial?.bemerkung.orEmpty()) }
                 var lieferDatum by remember { mutableStateOf(initial?.startDatum) }
+                var lieferDatumBis by remember { mutableStateOf(initial?.startDatum) }
 
                 var modus by remember { mutableStateOf(WiederholungsModus.KEINE) }
                 var startDate by remember { mutableStateOf(initial?.startDatum?.toLocalDate()) }
@@ -632,6 +639,12 @@
                                 label = "📅  Start-Datum & Zeit (optional)",
                                 initialDateTime = lieferDatum,
                                 onDateTimeSelected = { lieferDatum = it },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            DateTimePickerField(
+                                label = "🏁  End-Datum & Zeit (optional)",
+                                initialDateTime = lieferDatumBis,
+                                onDateTimeSelected = { lieferDatumBis = it },
                                 modifier = Modifier.fillMaxWidth()
                             )
                         }
@@ -734,20 +747,35 @@
                         Spacer(Modifier.width(8.dp))
 
                         // 4) Speichern
-                        Button(
-                            enabled = canSave,
-                            onClick = {
-                                onSave(
-                                    initial?.id,
-                                    sapVal.trim(), "", "",
-                                    "", "", massnahmeVal.trim(), bemerkungVal.trim(),
-                                    lieferDatum, WiederholungsModus.KEINE,
-                                    null, null, null, null, null, null
-                                )
-                            }
-                        ) {
-                            Text("Speichern")
-                        }
+
+                                Button(
+                                    enabled = canSave,
+                                    onClick = {
+                                        onSave(
+                                            initial?.id,
+                                            sapVal.trim(),
+                                            ortVal.trim(),
+                                            streckeVal.trim(),
+                                            kmVonVal.trim(),
+                                            kmBisVal.trim(),
+                                            massnahmeVal.trim(),
+                                            bemerkungVal.trim(),
+                                            lieferDatum,       // Start
+                                            lieferDatumBis,    // Ende
+                                            modus,
+                                            startDate,
+                                            startTime,
+                                            endDate,
+                                            endTime,
+                                            anzahlVal.toIntOrNull(),
+                                            dauerVal.toLongOrNull()
+                                        )
+                                    }
+                                ) {
+                                    Text("Speichern")
+                                }
+
+
                     }
                 }
 
@@ -1206,7 +1234,7 @@
                 val dateTimeFmt = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm")
                 val schichtCount = auftrag.schichten?.size ?: 0
                 val startTxt = auftrag.startDatum?.format(dateTimeFmt).orEmpty()
-
+                val endTxt = auftrag.endDatum?.format(dateTimeFmt).orEmpty()
                 Card(
                     modifier = modifier
                         .fillMaxWidth()
@@ -1228,7 +1256,7 @@
                         ) {
                             Row {
                                 Text(
-                                    text = "${index}. 📋 : ${auftrag.sapANummer.orEmpty()}",
+                                    text = "${index}. 📋 Auftrag: ${auftrag.sapANummer.orEmpty()}",
                                     style = MaterialTheme.typography.subtitle1.copy(
                                         fontSize = AppStyle.TextSizes.Normal
                                     ),
@@ -1237,7 +1265,7 @@
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "🛠️ : $schichtCount",
+                                    text = "     🛠️ : $schichtCount",
                                     fontSize = AppStyle.TextSizes.Small,
                                     color = AppStyle.Colors.TextPrimary
                                 )
@@ -1248,7 +1276,11 @@
                                 fontSize = AppStyle.TextSizes.Small,
                                 color = Color.Green
                             )
-
+                            Text(
+                                text = "    🏁 : $endTxt",
+                                fontSize = AppStyle.TextSizes.Small,
+                                color = Color.Green
+                            )
                             if (!auftrag.massnahme.isNullOrEmpty()) {
                                 Text(
                                     text = "    🏫 : ${auftrag.massnahme}",
@@ -1355,13 +1387,13 @@
                                     Text(
                                         text = "🚀 : $startTxt",
                                         fontSize = AppStyle.TextSizes.Small,
-                                        color = txtColor
+                                        color = Color.Green
                                     )
                                     Spacer(Modifier.width(16.dp))
                                     Text(
                                         text = "🏁 : $endTxt",
                                         fontSize = AppStyle.TextSizes.Small,
-                                        color = txtColor
+                                        color = Color.Green
                                     )
                                 }
 
