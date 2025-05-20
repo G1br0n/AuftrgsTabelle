@@ -185,6 +185,9 @@
                     Spacer(Modifier.width(4.dp))
                     /* Schichtenliste */
                     Column(Modifier.weight(4f)) {
+                       if (selectedAuftrag == null) {
+                        Spacer(Modifier.height(62.dp))
+                        }
                         selectedAuftrag?.let {
 
                             Spacer(Modifier.height(10.dp))
@@ -210,7 +213,7 @@
                             .orEmpty()
 
                         Text(
-                            "🛠️ Schichtenliste (${displayedSchichten.size})",
+                            "🛠️ Schichtenliste (${displayedSchichten.size})${if(selectedAuftrag?.sapANummer != null) "für ${selectedAuftrag.sapANummer}" else ""}",
                             style = MaterialTheme.typography.h6
                         )
                         Spacer(Modifier.height(GAP_XS))
@@ -246,23 +249,16 @@
                             .fillMaxHeight()
                             .width(0.5.dp)
                     )
-                    Spacer(Modifier.width(4.dp))
                     /* Detailansicht */
-                    /* Detailansicht */
-                    Column(Modifier.weight(6f).padding(start = 8.dp)) {
-                        Spacer(Modifier.height(70.dp))
-                        Text("🛠️ Schichtenliste (${selectedAuftrag?.schichten?.size ?: 0})", style = MaterialTheme.typography.h6)
-
-
+                    Column(Modifier.weight(6f)) {
+                        Spacer(Modifier.height(74.dp))
+                        Text("🔎 Details zu Schicht (${selectedAuftrag?.schichten?.size ?: 0})", style = MaterialTheme.typography.h6, modifier = Modifier.padding(start = 4.dp))
                         if (selectedSchicht != null && selectedAuftrag != null) {
                             SchichtDetailView(schicht = selectedSchicht, auftrag = selectedAuftrag)
                         } else {
-                            Text("Keine Schicht ausgewählt", color = Color.Gray)
+                            Text("Keine Schicht ausgewählt", color = Color.Gray, modifier = Modifier.padding(start = 4.dp))
                         }
                     }
-
-
-
                 }
 
 
@@ -1585,7 +1581,7 @@
                 Card(
                     modifier        = Modifier
                         .fillMaxWidth()
-                        .padding(8.dp),
+                        .padding(4.dp, top = 4.dp),
                     backgroundColor = bgColor,
                     elevation       = 0.dp,
                     border          = BorderStroke(1.dp, borderColor)
